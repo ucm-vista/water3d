@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Field Configuration | Water 3D</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#f0eeea",
+                        "on-tertiary-fixed": "#0d200d",
+                        "surface-variant": "#e4e2de",
+                        "surface-bright": "#fbf9f5",
+                        "secondary": "#934936",
+                        "on-primary-container": "#8292a5",
+                        "surface-dim": "#dbdad6",
+                        "on-primary-fixed-variant": "#384858",
+                        "on-background": "#1b1c1a",
+                        "on-error": "#ffffff",
+                        "error": "#ba1a1a",
+                        "on-surface-variant": "#43474c",
+                        "secondary-fixed": "#ffdbd2",
+                        "inverse-primary": "#b8c8dc",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#783523",
+                        "inverse-surface": "#30312e",
+                        "secondary-container": "#ffa188",
+                        "primary": "#051625",
+                        "tertiary-fixed": "#d1e9cb",
+                        "on-secondary-fixed": "#3c0800",
+                        "surface-container-high": "#eae8e4",
+                        "error-container": "#ffdad6",
+                        "background": "#fbf9f5",
+                        "surface-tint": "#506071",
+                        "primary-fixed-dim": "#b8c8dc",
+                        "inverse-on-surface": "#f2f0ec",
+                        "primary-fixed": "#d3e4f8",
+                        "on-tertiary-container": "#80977c",
+                        "on-secondary-fixed-variant": "#753321",
+                        "surface-container-low": "#f5f3ef",
+                        "primary-container": "#1b2b3a",
+                        "tertiary-container": "#1b2e1a",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-fixed-dim": "#b5cdb0",
+                        "surface-container-highest": "#e4e2de",
+                        "on-primary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "on-surface": "#1b1c1a",
+                        "on-error-container": "#93000a",
+                        "surface": "#fbf9f5",
+                        "outline": "#74777c",
+                        "secondary-fixed-dim": "#ffb4a1",
+                        "on-tertiary-fixed-variant": "#374c36",
+                        "outline-variant": "#c4c6cc",
+                        "tertiary": "#061908",
+                        "on-primary-fixed": "#0c1d2b"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "card-gap": "16px",
+                        "container-padding-mobile": "16px",
+                        "base": "8px",
+                        "gutter": "24px",
+                        "container-padding-desktop": "32px"
+                    },
+                    "fontFamily": {
+                        "data-display": ["Geist"],
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-sm": ["Geist"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "data-display": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "600"}],
+                        "headline-md": ["20px", {"lineHeight": "1.3", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: #fbf9f5; }
+        .flat-card {
+            background: #ffffff;
+            border: 1px solid #E2E8F0;
+            border-radius: 4px;
+            padding: 24px;
+        }
+        .step-inactive { opacity: 0.5; filter: grayscale(1); pointer-events: none; }
+        .map-placeholder {
+            background: linear-gradient(45deg, #e4e2de 25%, transparent 25%),
+                        linear-gradient(-45deg, #e4e2de 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #e4e2de 75%),
+                        linear-gradient(-45deg, transparent 75%, #e4e2de 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-container-padding-desktop h-16 bg-surface dark:bg-inverse-surface border-b border-outline-variant dark:border-outline">
+<div class="flex items-center gap-base"><span class="font-headline-md text-headline-md font-bold text-primary dark:text-on-primary-fixed">Water 3D</span><div class="ml-4 px-3 py-1 bg-surface-container-high rounded-full border border-outline-variant flex items-center gap-2 cursor-pointer"><span class="text-sm font-medium">Green Valley Ranch (Almonds)</span><span class="material-symbols-outlined text-sm">expand_more</span></div></div>
+<nav class="hidden md:flex items-center gap-gutter"><a class="text-on-surface-variant dark:text-on-primary-container pb-1 hover:text-primary dark:hover:text-inverse-primary transition-colors font-body-md text-body-md" href="#">Analytics</a><a class="text-on-surface-variant dark:text-on-primary-container pb-1 hover:text-primary dark:hover:text-inverse-primary transition-colors font-body-md text-body-md" href="#">Phenology</a><a class="text-on-surface-variant dark:text-on-primary-container pb-1 hover:text-primary dark:hover:text-inverse-primary transition-colors font-body-md text-body-md" href="#">Hydrology</a><a class="text-on-surface-variant dark:text-on-primary-container pb-1 hover:text-primary dark:hover:text-inverse-primary transition-colors font-body-md text-body-md" href="#">Reports</a></nav>
+<div class="flex items-center gap-base"><span class="font-headline-md text-headline-md font-bold text-primary dark:text-on-primary-fixed">Water 3D</span><div class="ml-4 px-3 py-1 bg-surface-container-high rounded-full border border-outline-variant flex items-center gap-2 cursor-pointer"><span class="text-sm font-medium">Green Valley Ranch (Almonds)</span><span class="material-symbols-outlined text-sm">expand_more</span></div></div>
+</header>
+<div class="flex pt-16 min-h-screen">
+<!-- SideNavBar with Quick Switcher -->
+<aside class="hidden lg:flex flex-col h-[calc(100vh-64px)] w-64 p-base bg-surface-container-low dark:bg-primary-container sticky top-16">
+<div class="mb-gutter px-base">
+<div class="relative group">
+<button class="w-full flex items-center justify-between gap-base p-2 bg-surface-container-lowest border border-outline-variant rounded hover:border-primary transition-all">
+<div class="flex items-center gap-base overflow-hidden">
+<div class="w-8 h-8 rounded bg-primary flex items-center justify-center text-on-primary text-[10px] font-bold shrink-0">S4</div>
+<div class="text-left">
+<p class="font-label-sm text-label-sm text-primary truncate">Sector 4</p>
+<p class="text-[10px] text-on-surface-variant">Almond</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline">unfold_more</span>
+</button>
+<!-- Quick Switcher Dropdown Placeholder -->
+<div class="hidden group-focus-within:block absolute top-full left-0 w-full mt-1 bg-white border border-outline-variant rounded shadow-lg z-10">
+<div class="p-2 hover:bg-surface-container transition-colors cursor-pointer flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-outline-variant shrink-0"></div>
+<span class="text-sm">Sector 1 (Walnut)</span>
+</div>
+<div class="p-2 hover:bg-surface-container transition-colors cursor-pointer flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-outline-variant shrink-0"></div>
+<span class="text-sm">Sector 2 (Pistachio)</span>
+</div>
+<div class="p-2 border-t border-outline-variant bg-surface-container-low font-bold text-primary flex items-center gap-2 p-2">
+<span class="material-symbols-outlined text-sm">add</span>
+<span class="text-xs uppercase">Configure New Field</span>
+</div>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-base p-3 text-on-surface-variant dark:text-on-primary-container hover:bg-surface-container-high dark:hover:bg-primary-fixed-variant rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-sm text-label-sm">Overview</span>
+</a>
+<a class="flex items-center gap-base p-3 bg-primary dark:bg-primary-fixed text-on-primary dark:text-on-primary-fixed rounded-lg font-bold" href="#">
+<span class="material-symbols-outlined" data-icon="settings_input_component" style="font-variation-settings: 'FILL' 1;">settings_input_component</span>
+<span class="font-label-sm text-label-sm">Setup Utility</span>
+</a>
+<a class="flex items-center gap-base p-3 text-on-surface-variant dark:text-on-primary-container hover:bg-surface-container-high dark:hover:bg-primary-fixed-variant rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="query_stats">query_stats</span>
+<span class="font-label-sm text-label-sm">Analytics View</span>
+</a>
+</nav>
+<div class="border-t border-outline-variant pt-base">
+<a class="flex items-center gap-base p-3 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-sm text-label-sm">Settings</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Canvas: Setup Utility -->
+<main class="flex-1 p-container-padding-desktop overflow-y-auto bg-surface-container-low">
+<div class="max-w-4xl mx-auto">
+<!-- Setup Progress Header -->
+<div class="mb-gutter">
+<h1 class="font-headline-lg text-headline-lg text-primary mb-2">New Field Configuration</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mb-8">Follow the steps to register a new field and activate automated API monitoring.</p>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 text-primary font-bold">
+<span class="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center text-sm">1</span>
+<span class="text-sm">Location</span>
+</div>
+<div class="h-px bg-outline-variant flex-1"></div>
+<div class="flex items-center gap-2 text-on-surface-variant opacity-60">
+<span class="w-8 h-8 rounded-full border-2 border-outline-variant flex items-center justify-center text-sm">2</span>
+<span class="text-sm">Crop Type</span>
+</div>
+<div class="h-px bg-outline-variant flex-1"></div>
+<div class="flex items-center gap-2 text-on-surface-variant opacity-60">
+<span class="w-8 h-8 rounded-full border-2 border-outline-variant flex items-center justify-center text-sm">3</span>
+<span class="text-sm">Finalize</span>
+</div>
+</div>
+</div>
+<!-- Step 1: Location -->
+<div class="grid grid-cols-12 gap-gutter">
+<div class="col-span-12 lg:col-span-7 flat-card">
+<h2 class="font-headline-md text-headline-md text-primary mb-4">1. Define Field Location</h2>
+<p class="text-sm text-on-surface-variant mb-6">Search for your ranch or drop a pin directly on the map to extract soil and weather API coordinates.</p>
+<div class="relative mb-4">
+<input class="w-full bg-surface-container-low border-outline-variant rounded-full py-3 px-12 focus:ring-0 focus:border-primary" placeholder="Search address, ranch name, or lat/long..." type="text"/>
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline">search</span>
+</div>
+<div class="w-full h-80 rounded border border-outline-variant map-placeholder relative overflow-hidden flex items-center justify-center bg-surface-container">
+<!-- Simulated Map UI -->
+<img class="absolute inset-0 w-full h-full object-cover opacity-50 grayscale" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAx1UG47ncpmlgKcQc36WUNUEOxejcEmDJrwKrOo4j5fmHAjvHXsnn2ZhNTC305aBLcgXBX_LyHvEb71E01PTVN_8q5vBvUkPQO-XEKtguziPJxO57qUYaBELI5GdlXA0cbzn3F8oMdo1vipg4P_xnnac0LBodfBas-fVE4rbXjTeQLtgnjywZDI6NRQ70uOW5sb51FcXr2WxURPAJL-JPSwtFGo6U7IV8lQ_hipmrfbhb0Q9E6Mi2WT6H1oxhB3j-UJj3xooNSymY"/>
+<div class="relative z-10 flex flex-col items-center">
+<span class="material-symbols-outlined text-secondary text-5xl drop-shadow-lg" style="font-variation-settings: 'FILL' 1;">location_on</span>
+<div class="bg-white px-3 py-1 rounded shadow-md mt-2 text-[10px] font-bold text-primary border border-outline-variant">PIN PLACED</div>
+</div>
+<!-- Map Controls -->
+<div class="absolute bottom-4 right-4 flex flex-col gap-1">
+<button class="w-8 h-8 bg-white border border-outline-variant rounded flex items-center justify-center shadow-sm">+</button>
+<button class="w-8 h-8 bg-white border border-outline-variant rounded flex items-center justify-center shadow-sm">-button&gt;</button>
+</div>
+</div>
+</div>
+<div class="col-span-12 lg:col-span-5 flex flex-col gap-gutter">
+<div class="flat-card">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-4">Detected Properties</h3>
+<div class="space-y-4">
+<div class="flex justify-between items-center border-b border-outline-variant pb-2">
+<span class="text-sm text-on-surface-variant">Soil Texture</span>
+<span class="font-data-display text-primary">Sandy Loam (SSURGO)</span>
+</div>
+<div class="flex justify-between items-center border-b border-outline-variant pb-2">
+<span class="text-sm text-on-surface-variant">Weather Cell</span>
+<span class="font-data-display text-primary">Grid ID #4829</span>
+</div>
+<div class="flex justify-between items-center pb-2">
+<span class="text-sm text-on-surface-variant">Elevation</span>
+<span class="font-data-display text-primary">342 ft</span>
+</div>
+</div>
+</div>
+<!-- Step 2 Preview (Interactive) -->
+<div class="flat-card bg-surface-container-lowest">
+<h2 class="font-headline-md text-headline-md text-primary mb-4">2. Select Crop</h2>
+<div class="space-y-3">
+<label class="flex items-center gap-3 p-3 border border-outline-variant rounded cursor-pointer hover:bg-surface-container transition-colors group">
+<input checked="" class="text-primary focus:ring-0" name="crop" type="radio"/>
+<span class="text-sm font-medium">Almonds (Nonpareil)</span>
+</label>
+<label class="flex items-center gap-3 p-3 border border-outline-variant rounded cursor-pointer hover:bg-surface-container transition-colors group">
+<input class="text-primary focus:ring-0" name="crop" type="radio"/>
+<span class="text-sm font-medium">Walnuts (Chandler)</span>
+</label>
+<label class="flex items-center gap-3 p-3 border border-outline-variant rounded cursor-pointer hover:bg-surface-container transition-colors group">
+<input class="text-primary focus:ring-0" name="crop" type="radio"/>
+<span class="text-sm font-medium">Pistachios (Kerman)</span>
+</label>
+<button class="w-full py-2 text-xs text-primary font-bold border border-dashed border-primary rounded mt-2">Custom Crop +</button>
+</div>
+</div>
+</div>
+<!-- Step 3 Preview / Actions -->
+<div class="col-span-12 flat-card flex justify-between items-center bg-primary text-on-primary">
+<div>
+<h3 class="font-headline-md text-headline-md">3. Name Your Field</h3>
+<input class="mt-2 bg-primary-container border-outline-variant text-on-primary rounded w-64 focus:ring-1 focus:ring-inverse-primary" placeholder="e.g. West Orchard Sector 4" type="text"/>
+</div>
+<button class="bg-secondary px-8 py-3 rounded font-bold hover:bg-secondary-container transition-all active:scale-95">
+                            ACTIVATE FIELD MONITORING
+                        </button>
+</div>
+</div>
+<!-- Guidance Note -->
+<div class="mt- gutter p-4 bg-surface-container border border-outline-variant rounded flex gap-base items-start">
+<span class="material-symbols-outlined text-primary">auto_awesome</span>
+<div class="text-sm">
+<p class="font-bold text-primary mb-1">Maintenance-Free Monitoring Enabled</p>
+<p class="text-on-surface-variant">Once activated, Water 3D uses automated Evapotranspiration (ET) and Growing Degree Day (GDD) feeds. You no longer need to manually log irrigation events or growth stages—our model calibrates daily using local station data.</p>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Footer -->
+<footer class="w-full py-8 px-container-padding-desktop flex flex-col md:flex-row justify-between items-center bg-surface-container-highest dark:bg-inverse-surface border-t border-outline-variant dark:border-outline">
+<div class="flex items-center gap-4 mb-4 md:mb-0">
+<span class="font-headline-md text-headline-md text-primary">Water 3D</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant">© 2024 Water 3D Hydrological Systems. All rights reserved.</p>
+</div>
+<div class="flex gap-gutter">
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Terms of Service</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">API Documentation</a>
+</div>
+</footer>
+<script>
+        // Placeholder for future interactivity
+        console.log("Setup utility initialized. Monitoring active API feeds.");
+    </script>
+</body></html>

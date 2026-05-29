@@ -1,0 +1,20 @@
+.DS_Store
+
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Local env files
+**/.env
+**/.env.local
+**/.env.*.local
+
+# PocketBase runtime data and binaries
+pocketbase/pb_data/
+pocketbase/pocketbase
+pocketbase/.DS_Store

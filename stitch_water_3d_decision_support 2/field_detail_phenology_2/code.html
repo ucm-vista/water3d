@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Field Detail &amp; Phenology | Water 3D</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#f0eeea",
+                        "on-tertiary-fixed": "#0d200d",
+                        "surface-variant": "#e4e2de",
+                        "surface-bright": "#fbf9f5",
+                        "secondary": "#934936",
+                        "on-primary-container": "#8292a5",
+                        "surface-dim": "#dbdad6",
+                        "on-primary-fixed-variant": "#384858",
+                        "on-background": "#1b1c1a",
+                        "on-error": "#ffffff",
+                        "error": "#ba1a1a",
+                        "on-surface-variant": "#43474c",
+                        "secondary-fixed": "#ffdbd2",
+                        "inverse-primary": "#b8c8dc",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#783523",
+                        "inverse-surface": "#30312e",
+                        "secondary-container": "#ffa188",
+                        "primary": "#051625",
+                        "tertiary-fixed": "#d1e9cb",
+                        "on-secondary-fixed": "#3c0800",
+                        "surface-container-high": "#eae8e4",
+                        "error-container": "#ffdad6",
+                        "background": "#fbf9f5",
+                        "surface-tint": "#506071",
+                        "primary-fixed-dim": "#b8c8dc",
+                        "inverse-on-surface": "#f2f0ec",
+                        "primary-fixed": "#d3e4f8",
+                        "on-tertiary-container": "#80977c",
+                        "on-secondary-fixed-variant": "#753321",
+                        "surface-container-low": "#f5f3ef",
+                        "primary-container": "#1b2b3a",
+                        "tertiary-container": "#1b2e1a",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-fixed-dim": "#b5cdb0",
+                        "surface-container-highest": "#e4e2de",
+                        "on-primary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "on-surface": "#1b1c1a",
+                        "on-error-container": "#93000a",
+                        "surface": "#fbf9f5",
+                        "outline": "#74777c",
+                        "secondary-fixed-dim": "#ffb4a1",
+                        "on-tertiary-fixed-variant": "#374c36",
+                        "outline-variant": "#c4c6cc",
+                        "tertiary": "#061908",
+                        "on-primary-fixed": "#0c1d2b"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "card-gap": "16px",
+                        "container-padding-mobile": "16px",
+                        "base": "8px",
+                        "gutter": "24px",
+                        "container-padding-desktop": "32px"
+                    },
+                    "fontFamily": {
+                        "data-display": ["Geist"],
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-sm": ["Geist"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "data-display": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "600"}],
+                        "headline-md": ["20px", {"lineHeight": "1.3", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: #fbf9f5; }
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 24px;
+        }
+        .flat-card {
+            background: #ffffff;
+            border: 1px solid #E2E8F0;
+            border-radius: 4px;
+            padding: 24px;
+        }
+        .status-badge {
+            font-family: 'Geist', sans-serif;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 2px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .chart-grid-line { stroke: #E2E8F0; stroke-width: 1; }
+        .chart-curve-primary { stroke: #051625; stroke-width: 2; fill: none; }
+        .chart-curve-secondary { stroke: #934936; stroke-width: 2; stroke-dasharray: 4; fill: none; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-container-padding-desktop h-16 bg-surface dark:bg-inverse-surface border-b border-outline-variant dark:border-outline">
+<div class="flex items-center gap-base">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-on-primary-fixed">Water 3D</span>
+</div>
+<nav class="hidden md:flex items-center gap-gutter">
+<a class="text-on-surface-variant dark:text-on-primary-container pb-1 hover:text-primary dark:hover:text-inverse-primary transition-colors font-body-md text-body-md" href="#">Dashboard</a>
+<a class="text-primary dark:text-inverse-primary font-bold border-b-2 border-primary dark:border-inverse-primary pb-1 font-body-md text-body-md" href="#">Irrigation</a>
+<a class="text-on-surface-variant dark:text-on-primary-container pb-1 hover:text-primary dark:hover:text-inverse-primary transition-colors font-body-md text-body-md" href="#">Budget</a>
+<a class="text-on-surface-variant dark:text-on-primary-container pb-1 hover:text-primary dark:hover:text-inverse-primary transition-colors font-body-md text-body-md" href="#">Fields</a>
+</nav>
+<div class="flex items-center gap-base">
+<button class="material-symbols-outlined text-on-surface-variant">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant">account_circle</button>
+</div>
+</header>
+<div class="flex pt-16 min-h-screen">
+<!-- SideNavBar -->
+<aside class="hidden lg:flex flex-col h-[calc(100vh-64px)] w-64 p-base bg-surface-container-low dark:bg-primary-container sticky top-16">
+<div class="mb-gutter px-base">
+<div class="flex items-center gap-base mb-2">
+<img class="w-10 h-10 rounded-lg object-cover" data-alt="A cinematic, high-resolution aerial photograph of a lush almond orchard in the California Central Valley during golden hour. The sunlight filters through the green canopy, highlighting the precision-planted rows. The overall aesthetic is professional and agricultural, with warm earth tones and deep greens dominating the color palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAx1UG47ncpmlgKcQc36WUNUEOxejcEmDJrwKrOo4j5fmHAjvHXsnn2ZhNTC305aBLcgXBX_LyHvEb71E01PTVN_8q5vBvUkPQO-XEKtguziPJxO57qUYaBELI5GdlXA0cbzn3F8oMdo1vipg4P_xnnac0LBodfBas-fVE4rbXjTeQLtgnjywZDI6NRQ70uOW5sb51FcXr2WxURPAJL-JPSwtFGo6U7IV8lQ_hipmrfbhb0Q9E6Mi2WT6H1oxhB3j-UJj3xooNSymY"/>
+<div>
+<p class="font-headline-md text-headline-md text-primary dark:text-on-primary-fixed">Main Ranch</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Central Valley District</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-base p-3 text-on-surface-variant dark:text-on-primary-container hover:bg-surface-container-high dark:hover:bg-primary-fixed-variant rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-sm text-label-sm">Overview</span>
+</a>
+<a class="flex items-center gap-base p-3 bg-primary dark:bg-primary-fixed text-on-primary dark:text-on-primary-fixed rounded-lg font-bold" href="#">
+<span class="material-symbols-outlined" data-icon="query_stats" style="font-variation-settings: 'FILL' 1;">query_stats</span>
+<span class="font-label-sm text-label-sm">Analytics</span>
+</a>
+<a class="flex items-center gap-base p-3 text-on-surface-variant dark:text-on-primary-container hover:bg-surface-container-high dark:hover:bg-primary-fixed-variant rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="calendar_month">calendar_month</span>
+<span class="font-label-sm text-label-sm">Scheduler</span>
+</a>
+<a class="flex items-center gap-base p-3 text-on-surface-variant dark:text-on-primary-container hover:bg-surface-container-high dark:hover:bg-primary-fixed-variant rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-label-sm text-label-sm">Budgeting</span>
+</a>
+</nav>
+<button class="w-full py-3 mt-gutter bg-primary text-on-primary font-bold rounded-lg mb-gutter active:scale-95 duration-100">
+                New Irrigation Cycle
+            </button>
+<div class="border-t border-outline-variant pt-base">
+<a class="flex items-center gap-base p-3 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-sm text-label-sm">Settings</span>
+</a>
+<a class="flex items-center gap-base p-3 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-label-sm text-label-sm">Support</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 p-container-padding-desktop overflow-y-auto">
+<!-- Breadcrumbs & Header -->
+<div class="mb-gutter flex justify-between items-end">
+<div>
+<div class="flex items-center gap-2 mb-2">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Fields</span>
+<span class="material-symbols-outlined text-[12px] text-outline">chevron_right</span>
+<span class="font-label-sm text-label-sm text-primary">Sector 4</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-primary">Almond - Sector 4</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Nonpareil variety, planted 2018. Sandy Loam soil.</p>
+</div>
+<div class="flex gap-base">
+<button class="px-4 py-2 border border-outline text-primary font-medium rounded text-sm hover:bg-surface-container transition-colors">Export Report</button>
+<button class="px-4 py-2 bg-primary text-on-primary font-medium rounded text-sm active:scale-95 duration-100">Adjust Irrigation</button>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="bento-grid">
+<!-- GDD Accumulation & Stage Markers (Large) -->
+<div class="col-span-12 lg:col-span-8 flat-card flex flex-col">
+<div class="flex justify-between items-center mb-6 border-b border-outline-variant pb-base">
+<h2 class="font-headline-md text-headline-md text-primary">GDD Accumulation &amp; Phenology</h2>
+<div class="flex gap-4">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 bg-primary rounded-full"></span>
+<span class="font-label-sm text-label-sm">Cumulative GDD</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 border border-secondary border-dashed rounded-full"></span>
+<span class="font-label-sm text-label-sm">Historical Avg</span>
+</div>
+</div>
+</div>
+<div class="flex-1 relative min-h-[300px]">
+<!-- SVG Chart Simulation -->
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 800 300">
+<line class="chart-grid-line" x1="0" x2="800" y1="280" y2="280"></line>
+<line class="chart-grid-line" x1="0" x2="800" y1="210" y2="210"></line>
+<line class="chart-grid-line" x1="0" x2="800" y1="140" y2="140"></line>
+<line class="chart-grid-line" x1="0" x2="800" y1="70" y2="70"></line>
+<!-- Historical Dash -->
+<path class="chart-curve-secondary opacity-40" d="M0,280 Q200,270 400,200 T800,50"></path>
+<!-- Current GDD -->
+<path class="chart-curve-primary" d="M0,280 Q200,275 400,180"></path>
+<!-- Stage Markers -->
+<g transform="translate(180, 270)">
+<circle fill="#051625" r="4"></circle>
+<text class="font-label-sm text-[10px] fill-on-surface-variant" text-anchor="middle" x="0" y="-15">Bloom (Feb 14)</text>
+</g>
+<g transform="translate(400, 180)">
+<circle fill="#ba1a1a" r="6"></circle>
+<text class="font-label-sm text-[12px] font-bold fill-primary" text-anchor="middle" x="0" y="-20">CURRENT: Nut Fill</text>
+</g>
+<g transform="translate(550, 110)">
+<circle fill="#934936" opacity="0.5" r="4"></circle>
+<text class="font-label-sm text-[10px] fill-on-surface-variant" text-anchor="middle" x="0" y="-15">Hull Split (Est. Jul 20)</text>
+</g>
+</svg>
+<div class="absolute bottom-0 left-0 w-full flex justify-between font-label-sm text-label-sm text-outline px-2 mt-2">
+<span>JAN</span><span>FEB</span><span>MAR</span><span>APR</span><span>MAY</span><span>JUN</span><span>JUL</span><span>AUG</span>
+</div>
+</div>
+<div class="mt-6 flex gap-gutter">
+<div class="flex-1 bg-surface-container-low p-4 rounded border border-outline-variant">
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase">Current Accumulation</p>
+<p class="font-headline-md text-headline-md text-primary mt-1">1,428 GDD</p>
+<p class="text-[10px] text-tertiary font-bold mt-1">+12% VS HISTORICAL</p>
+</div>
+<div class="flex-1 bg-surface-container-low p-4 rounded border border-outline-variant">
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase">Projected Harvest</p>
+<p class="font-headline-md text-headline-md text-primary mt-1">Aug 24, 2024</p>
+<p class="text-[10px] text-secondary font-bold mt-1">EARLY SEASON TREND</p>
+</div>
+</div>
+</div>
+<!-- Input: Observed Stage (Small) -->
+<div class="col-span-12 lg:col-span-4 flat-card">
+<h2 class="font-headline-md text-headline-md text-primary mb-4">Ground Truth</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">Log field observations to calibrate the phenology model.</p>
+<div class="space-y-4">
+<div>
+<label class="font-label-sm text-label-sm text-on-surface-variant block mb-2">Observed Phenological Stage</label>
+<select class="w-full bg-surface-container-low border-outline-variant rounded focus:border-primary focus:ring-0 text-body-md">
+<option>Early Nut Fill</option>
+<option selected="">Mid Nut Fill</option>
+<option>Late Nut Fill</option>
+<option>Hull Split Initiated</option>
+</select>
+</div>
+<div>
+<label class="font-label-sm text-label-sm text-on-surface-variant block mb-2">Confidence Level (%)</label>
+<input class="w-full accent-primary" max="100" min="0" type="range" value="90"/>
+</div>
+<div>
+<label class="font-label-sm text-label-sm text-on-surface-variant block mb-2">Notes</label>
+<textarea class="w-full bg-surface-container-low border-outline-variant rounded text-body-md h-20" placeholder="Visual confirmation of embryo expansion..."></textarea>
+</div>
+<button class="w-full py-3 bg-secondary text-on-secondary font-bold rounded active:scale-95 duration-150">Update Model Data</button>
+</div>
+<div class="mt-8 border-t border-outline-variant pt-4">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-4">Model Reliability</h3>
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full border-4 border-tertiary-fixed border-t-tertiary flex items-center justify-center">
+<span class="font-label-sm text-label-sm text-tertiary">98%</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant leading-tight">High alignment between GDD forecast and satellite NDVI.</p>
+</div>
+</div>
+</div>
+<!-- Kc Curve Visualization (Medium) -->
+<div class="col-span-12 lg:col-span-6 flat-card">
+<div class="flex justify-between items-center mb-6">
+<h2 class="font-headline-md text-headline-md text-primary">Kc Curve (Crop Coefficient)</h2>
+<span class="status-badge bg-tertiary-fixed text-on-tertiary-fixed">Active Growth</span>
+</div>
+<div class="h-48 relative">
+<!-- Kc Curve Representation -->
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 500 150">
+<path class="stroke-primary fill-transparent" d="M0,130 L100,120 L250,30 L400,30 L500,100" stroke-width="3"></path>
+<circle cx="300" cy="30" fill="#051625" r="5"></circle>
+</svg>
+<div class="absolute top-4 left-[60%] border-l border-primary pl-2">
+<p class="font-label-sm text-label-sm text-primary font-bold">Current Kc: 1.05</p>
+<p class="font-label-sm text-[10px] text-on-surface-variant">Peak Transpiration Phase</p>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-base mt-4 text-center">
+<div class="border-r border-outline-variant">
+<p class="font-label-sm text-[10px] text-on-surface-variant">INIT</p>
+<p class="font-data-display text-data-display">0.40</p>
+</div>
+<div class="border-r border-outline-variant">
+<p class="font-label-sm text-[10px] text-on-surface-variant">MID</p>
+<p class="font-data-display text-data-display">1.05</p>
+</div>
+<div>
+<p class="font-label-sm text-[10px] text-on-surface-variant">END</p>
+<p class="font-data-display text-data-display">0.70</p>
+</div>
+</div>
+</div>
+<!-- ETc vs ETo (Medium) -->
+<div class="col-span-12 lg:col-span-6 flat-card">
+<h2 class="font-headline-md text-headline-md text-primary mb-6">ET Comparison (7-Day)</h2>
+<div class="space-y-4">
+<div class="flex items-center gap-4">
+<div class="flex-1">
+<div class="flex justify-between font-label-sm text-[10px] mb-1">
+<span>ETo (Reference)</span>
+<span>0.28 in/day</span>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-outline-variant h-full" style="width: 70%"></div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex-1">
+<div class="flex justify-between font-label-sm text-[10px] mb-1">
+<span>ETc (Actual Crop)</span>
+<span>0.29 in/day</span>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full" style="width: 75%"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-8 p-4 bg-surface-container-lowest border border-outline-variant flex items-start gap-base">
+<span class="material-symbols-outlined text-secondary">info</span>
+<p class="font-body-md text-sm text-on-surface-variant">Crop demand is currently exceeding reference ET due to high leaf area index and localized heat. Consider a 5% increase in next cycle duration.</p>
+</div>
+</div>
+<!-- Chill Portions Tracker (Dormancy Focus) -->
+<div class="col-span-12 lg:col-span-4 flat-card bg-surface-container-lowest">
+<h2 class="font-headline-md text-headline-md text-primary mb-4">Chill Portions (Dynamic)</h2>
+<div class="flex items-center justify-between mb-6">
+<span class="status-badge bg-surface-variant text-on-surface-variant">Dormant Season Closed</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Winter 2023-24</span>
+</div>
+<div class="flex items-baseline gap-2 mb-2">
+<span class="text-4xl font-extrabold text-primary">78.4</span>
+<span class="font-label-sm text-on-surface-variant">Portions</span>
+</div>
+<p class="font-label-sm text-[10px] text-tertiary font-bold mb-6">THRESHOLD MET: 65 PORTIONS</p>
+<div class="relative h-2 w-full bg-surface-container rounded-full mb-8">
+<div class="absolute h-full bg-tertiary rounded-full" style="width: 100%"></div>
+<div class="absolute -top-1 left-[65%] w-[2px] h-4 bg-error"></div>
+</div>
+<ul class="space-y-3">
+<li class="flex justify-between font-body-md text-sm border-b border-outline-variant pb-2">
+<span class="text-on-surface-variant">Bloom Homogeneity</span>
+<span class="font-bold text-tertiary">Excellent</span>
+</li>
+<li class="flex justify-between font-body-md text-sm border-b border-outline-variant pb-2">
+<span class="text-on-surface-variant">Avg Temp (Dec-Jan)</span>
+<span class="font-bold">42.4°F</span>
+</li>
+</ul>
+</div>
+<!-- Log / History Table -->
+<div class="col-span-12 lg:col-span-8 flat-card overflow-hidden flex flex-col">
+<h2 class="font-headline-md text-headline-md text-primary mb-4">Field Log &amp; Stage History</h2>
+<div class="overflow-x-auto flex-1">
+<table class="w-full border-collapse">
+<thead>
+<tr class="bg-surface-container-low text-left">
+<th class="p-3 font-label-sm text-label-sm text-on-surface-variant uppercase">Date</th>
+<th class="p-3 font-label-sm text-label-sm text-on-surface-variant uppercase">Observed Stage</th>
+<th class="p-3 font-label-sm text-label-sm text-on-surface-variant uppercase">GDD (Delta)</th>
+<th class="p-3 font-label-sm text-label-sm text-on-surface-variant uppercase">NDVI Value</th>
+<th class="p-3 font-label-sm text-label-sm text-on-surface-variant uppercase">Action</th>
+</tr>
+</thead>
+<tbody class="font-body-md text-sm">
+<tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+<td class="p-3 font-data-display">May 12, 2024</td>
+<td class="p-3">Mid Nut Fill</td>
+<td class="p-3">+22 GDD</td>
+<td class="p-3">0.82</td>
+<td class="p-3 text-primary font-bold cursor-pointer">Details</td>
+</tr>
+<tr class="border-b border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low transition-colors">
+<td class="p-3 font-data-display">May 05, 2024</td>
+<td class="p-3">Early Nut Fill</td>
+<td class="p-3">+18 GDD</td>
+<td class="p-3">0.78</td>
+<td class="p-3 text-primary font-bold cursor-pointer">Details</td>
+</tr>
+<tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+<td class="p-3 font-data-display">Apr 28, 2024</td>
+<td class="p-3">Fruit Set</td>
+<td class="p-3">+24 GDD</td>
+<td class="p-3">0.65</td>
+<td class="p-3 text-primary font-bold cursor-pointer">Details</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Footer -->
+<footer class="w-full py-8 px-container-padding-desktop flex flex-col md:flex-row justify-between items-center bg-surface-container-highest dark:bg-inverse-surface border-t border-outline-variant dark:border-outline">
+<div class="flex items-center gap-4 mb-4 md:mb-0">
+<span class="font-headline-md text-headline-md text-primary">Water 3D</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant">© 2024 Water 3D Hydrological Systems. All rights reserved.</p>
+</div>
+<div class="flex gap-gutter">
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Terms of Service</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">API Documentation</a>
+</div>
+</footer>
+<!-- FAB Overlay (Contextual for Irrigation Action) -->
+<button class="fixed bottom-8 right-8 w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">water_drop</span>
+</button>
+<script>
+        // Simple atmosphere: random subtle pulsing for 'live' indicators
+        setInterval(() => {
+            const badges = document.querySelectorAll('.status-badge');
+            badges.forEach(b => {
+                b.style.opacity = (0.85 + Math.random() * 0.15).toString();
+            });
+        }, 2000);
+    </script>
+</body></html>

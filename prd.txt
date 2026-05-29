@@ -1,0 +1,150 @@
+Water 3D — Product Requirements Document
+Tagline: Data Driven Decisions for Central Valley water users
+Owner: Emery, VISTA / UC Merced Status: Draft v0.3 Last updated: 2026-04-30
+
+1. Summary
+Water 3D is a decision support tool for Central Valley California growers and irrigation managers. It integrates a suite of agronomic calculations — growing degree day (GDD) accumulation, crop evapotranspiration (ETc) accumulation, soil water balance, chill accumulation, frost/heat stress tracking, and VPD — into a single, crop-aware model that translates raw weather data into actionable irrigation and phenology decisions.
+
+The "3D" refers to the three integrated dimensions at the core of the decision: thermal time, water demand, and soil water status. Additional climate-stress tools layer on top of that core to flag risks the grower needs to act on.
+
+2. Decisions the tool supports
+Phenology timing — has the crop reached the next stage (bloom, veraison, hull split, etc.)?
+Irrigation scheduling — days until depletion hits MAD; recommended depth at next set
+Seasonal water budget — projected total applied water through season end at current and forecast ET
+Dormancy / chill — has the orchard or vineyard met its chill requirement before bloom?
+Stress events — frost, heat, and high-VPD days that warrant protective action (frost protection, evaporative cooling, irrigation timing shift)
+3. Crops (v1)
+Four crops covering the dominant Central Valley irrigation patterns: one nut, one row crop, one perennial fruit, one forage.
+
+Crop	Tbase (°C)	Tupper (°C)	Kc ini → mid → end	Stage thresholds	MAD	Root depth (m)	TAW (mm/m)	Chill req. (CP)	Frost critical	Heat critical
+Almond	4.5	30	0.40 → 1.15 → 0.90	Bloom ~250 GDD, hull split ~2000 GDD, harvest ~2700 GDD	40%	1.5	150	35–55	<-2°C at bloom	>38°C at hull split
+Tomato (processing)	10	30	0.30 → 1.15 → 0.70	Flowering ~450 GDD, fruit set ~700 GDD, red ripe ~1400 GDD	40%	1.0	150	n/a	<0°C seedling	>35°C at fruit set
+Wine grape	10	30	0.30 → 0.70 → 0.45	Budbreak (start), bloom ~350 GDD, veraison ~1400 GDD, harvest 1700–2700 GDD by region/style	50%	1.5	130	30–70	<-1°C at budbreak	>35°C at veraison
+Alfalfa	5	30	0.40 → 0.95 → 0.90	Per-cutting cycle; ~10% bloom typical cut trigger	50%	2.0	140	n/a	n/a	n/a
+Values are starting points sourced from FAO-56, UC ANR irrigation publications, DWR Bulletin 113, and UC IPM. They need farm advisor review before production use and should be tunable per field in v2.
+
+4. Calculation tools
+4.1 GDD calculator
+GDD_day = max(0, ((min(Tmax, Tupper) + max(Tmin, Tbase)) / 2) − Tbase)
+GDD_cumulative = Σ GDD_day from stage_start_date
+Simple averaging method (matches CIMIS / UC IPM convention). Single-sine and double-triangle methods deferred to v2.
+
+Inputs: daily Tmin/Tmax, crop Tbase + Tupper, stage start date Outputs: daily GDD, cumulative GDD, current phenological stage, days/GDD to next stage
+
+4.2 ETc accumulator
+Kc(t) = piecewise-linear interpolation across stage thresholds
+        — driven by GDD for tree crops & grapes,
+          calendar days from planting for tomato,
+          per-cutting cycle for alfalfa
+ETc_day = ETo_day × Kc(t)
+ETc_cumulative = Σ ETc_day from stage_start_date
+Inputs: daily ETo from API, crop Kc curve, current stage position Outputs: daily Kc, daily ETc, cumulative ETc, projected season-end ETc using forecast ETo
+
+4.3 Soil water balance
+Dr_day = max(0, Dr_prev + ETc_day − P_day − I_day)
+TAW = AWHC × root_depth      (mm)
+RAW = TAW × MAD              (irrigate when Dr ≥ RAW)
+Forecast projection: roll Dr forward day-by-day using forecast ETc and forecast precip with no irrigation, until Dr ≥ RAW. That date is the days-until-irrigation output. Recommended irrigation depth = Dr_at_trigger / system_efficiency (default 0.85 microirrigation, 0.75 sprinkler).
+
+Inputs: ETc (from 4.2), precip, irrigation log, AWHC, root depth, MAD, system efficiency Outputs: current depletion, days until next irrigation, recommended depth, depletion vs. RAW vs. TAW status
+
+4.4 Chill accumulation (Dynamic Model)
+Tracks dormancy chill accumulation between leaf fall and budbreak. Uses the Dynamic Model (chill portions) — the modern standard, replacing chill hours and the Utah model. Critical for almond, pistachio, stone fruit, and wine grape.
+
+chill_portions = DynamicModel(hourly_temps)
+deficit = crop_chill_requirement − chill_portions_accumulated
+The Dynamic Model requires hourly temperatures. If the API returns daily Tmin/Tmax only, interpolate to hourly using a sine-wave fit between Tmin (sunrise) and Tmax (mid-afternoon).
+
+Inputs: hourly temps (or interpolated from daily Tmin/Tmax), accumulation start date (default Nov 1), crop chill requirement Outputs: cumulative chill portions, deficit/surplus vs. requirement, projected season-end portions, flag if requirement unlikely to be met
+
+4.5 Frost / freeze hour counter
+Counts hours below crop- and stage-specific critical temperatures. Highest value during bloom (almond, grape) and seedling establishment (tomato).
+
+frost_hours_day = count(hourly_temp < T_critical)
+frost_event = frost_hours_day > 0 AND stage ∈ frost_sensitive_stages
+Forecast-driven alerts: flag any forecast day in the next 7 with predicted Tmin below the stage-specific threshold.
+
+Inputs: hourly temps (or daily Tmin), current crop stage, stage-specific T_critical Outputs: frost hours per day, cumulative frost hours by stage, forecast frost alerts (next 7 days)
+
+4.6 Heat stress hour counter
+Counts hours above crop- and stage-specific high-temperature thresholds. Tomato fruit set fails above ~35°C; almond hull rot risk rises above ~38°C; grape berry quality drops above ~35°C at veraison.
+
+heat_hours_day = count(hourly_temp > T_critical)
+heat_event = heat_hours_day > threshold AND stage ∈ heat_sensitive_stages
+Inputs: hourly temps (or daily Tmax), current crop stage, stage-specific T_critical Outputs: heat hours per day, cumulative heat hours by stage, forecast heat alerts (next 7 days)
+
+4.7 Vapor pressure deficit (VPD)
+VPD drives transpiration and is increasingly the preferred metric over straight temperature for stress decisions, especially in wine grape and high-value tree crops.
+
+es(T) = 0.6108 × exp(17.27 × T / (T + 237.3))      (saturation vapor pressure, kPa)
+ea = es(Tdew)  OR  es(Tmean) × RH/100
+VPD = es(Tmean) − ea                               (kPa)
+Daily mean VPD calculated from API temps + RH or dewpoint. If the API doesn't provide humidity, the calculation is gated and surfaces as "data unavailable" rather than estimated.
+
+Inputs: Tmean (or Tmin/Tmax), RH or Tdew from API Outputs: daily mean VPD, daytime max VPD, flag for high-VPD days (>2.5 kPa sustained), 7-day forecast VPD profile
+
+5. Data inputs
+5.1 Weather/ET API contract
+Existing API provides historical and forecast weather + ET. Required per-day fields:
+
+date            ISO date
+tmin, tmax      °C
+precip          mm
+eto             mm  (reference ET, ASCE/Penman-Monteith preferred)
+source          historical | forecast
+Optional but unlocks additional tools:
+
+rh_min, rh_max  %       (or tdew — needed for VPD)
+hourly_temps    °C[24]  (improves chill, frost, heat accuracy)
+The model treats historical and forecast records identically in calculation but flags forecast outputs as projected. When optional fields are missing, the dependent tools (VPD, hourly-resolution chill) gracefully degrade or surface as unavailable.
+
+5.2 Field configuration (per field)
+Lat/lon or station ID
+Crop + stage start date (planting, budbreak, green-up)
+Soil texture → AWHC (with manual override in mm/m)
+Irrigation log: date + applied depth
+Optional: rainfall log if not from API
+Optional: irrigation system efficiency override
+Optional: chill accumulation start date override (default Nov 1)
+6. Tech stack (proposed)
+Calculation core: TypeScript module, framework-agnostic, unit-tested against UC ANR / UC IPM worked examples
+Backend: existing weather/ET API; no additional backend needed for v1
+Persistence: localStorage for v1; Postgres/Supabase if multi-user later
+The calculation core should be a standalone library that can be consumed by any frontend later.
+
+7. Milestones
+Milestone	Scope	Rough effort
+M0 — Spec sign-off	This document, crop parameter review by an advisor	1 wk
+M1 — Core water/thermal calcs	TS module: GDD, Kc curves, ETc, soil water balance, with unit tests	1–2 wks
+M2 — Stress & dormancy calcs	Chill portions, frost/heat hour counters, VPD	1 wk
+M3 — API integration	Wire calculation core to weather/ET API, validate against a real field-season of data	1 wk
+M4 — Multi-crop coverage	All four crops with full Kc + stage logic, alfalfa cutting handling, stress thresholds tuned	2 wks
+8. Success metrics
+Calculated ETc within 5% of UC ANR worked examples for all four crops
+GDD accumulation matches UC IPM degree-day calculator output for the same station/date range
+Chill portion output matches the UC ANR chill calculator for the same station/season
+Zero math bugs flagged by a farm advisor reviewer
+9. Open questions
+Which stations / lat-lon points does the weather API cover relative to ESF and partner fields?
+Does the API return rainfall, RH/dewpoint, and hourly temperatures, or only daily Tmin/Tmax + ETo?
+Alfalfa Kc reset on cutting — does the API return cutting events, or does the user log them manually?
+Tree crop dormancy — pause GDD accumulation between harvest and bloom, or run year-round? (Chill accumulation runs during this window regardless.)
+Deficit irrigation strategies for wine grape (RDI, SDI) — v1 or v2?
+Frost/heat critical temperatures vary by variety; v1 uses crop-level defaults, but should we expose variety overrides?
+10. Risks
+Crop coefficient accuracy — Kc curves vary by region and canopy management; defaults need farm advisor review before reaching growers.
+API reliability — single point of failure; calculation core needs graceful degradation when forecast or optional fields are missing.
+Soil heterogeneity — single AWHC per field is a simplification; coarse-textured spots will dry down faster than the model predicts.
+Chill model assumptions — Dynamic Model requires hourly temps; sine-wave interpolation from daily Tmin/Tmax introduces error, particularly in marine-influenced or windy conditions.
+Stress threshold liability — frost and heat alerts could be acted on (e.g., turning on wind machines, frost sprinklers); thresholds must be reviewed and outputs framed as advisory.
+Liability / scope — outputs should be framed as decision support estimates, not prescriptions.
+11. Reference sources
+FAO Irrigation and Drainage Paper 56 (Allen et al., 1998) — Kc framework, ETo, VPD
+UC ANR Publication 21626 — almond irrigation
+UC ANR drip irrigation manual — processing tomato
+DWR Bulletin 113 — California crop coefficients
+CIMIS — reference ET methodology
+UC IPM degree-day models — phenology validation
+Fishman, Erez & Couvillon (1987) — Dynamic Model for chill portions
+UC ANR chill calculator — chill portion validation
+UC ANR frost protection publications — critical temperature thresholds by crop and stage

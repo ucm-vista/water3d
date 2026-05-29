@@ -1,0 +1,181 @@
+Water 3D Project Meeting on App Design and Features
+Date/Time: May 21, 2026, 10:52 AM PDT.
+Overall Summary
+Emery and a colleague discussed refining the Water 3D app's scope to focus on reliable, valuable features for farmers, emphasizing data-driven dashboards over map-heavy interfaces. They planned to use APIs like OpenET and Catherine's for ET data, simplify user setup with pin drops for location, and prioritize maintainability and usability.
+Key Points
+The app will limit scope to essential features, avoiding complex irrigation scheduling and unreliable components.
+User accounts will be anonymous by default, allowing users to input farm location and crop data, with location set by dropping pins on a map during setup only.
+The map will be minimized in the UI, mainly used for initial setup; most value comes from analytics and data dashboards rather than map visuals.
+ET data will be pulled from reliable APIs such as OpenET and Catherine's API to provide growing degree days, ET accumulation, and historical comparisons for crops.
+The team prefers to build on stable external APIs to reduce maintenance burden and ensure data reliability.
+Action Items
+Use AI-generated meeting summaries to streamline note-taking and iteration.
+Refine the app UI in Stitch for faster development and cleaner components.
+Implement location setup with map pin drops and crop selection, enabling users to manage multiple fields.
+Integrate ET data from OpenET and Catherine's API for real-time and historical analytics.
+Remove or postpone irrigation scheduling and budgeting features until core analytics are solid and valuable.
+Open Questions
+How to best display multiple farm locations and crops in the UI for easy switching.
+Whether to include optional water allocation and cost inputs for more detailed budgeting.
+Potential future integration of groundwater monitoring and CIMIS data once core features are stable.
+How to balance UI simplicity with providing meaningful data without overwhelming users.
+ 
+ 
+The biggest design change is moving the app away from being a “map application” and turning it into a focused analytics tool for farmers.
+Right now, the design still treats the map as the center of the experience. The meeting shifted that pretty heavily.
+Here are the main changes that came out of the discussion:
+1. Remove the Map as the Main Experience
+Current direction
+Large full-screen map
+Separate map tab
+Lots of spatial UI
+Pins and stations as the focus
+New direction
+The map becomes a setup utility only.
+The farmer only needs the map to:
+search for their farm
+drop a pin
+choose a crop
+save the field
+After that, the map mostly disappears.
+Why
+The farmer already knows where their farm is. The map itself is not delivering value.
+The value comes from:
+ET data
+degree days
+chill hours
+historical comparisons
+crop analytics
+So the UI should prioritize data, not geography.
+2. Make Analytics the Primary Screen
+This becomes the “real product.”
+Instead of:
+Map
+Budget
+Scheduler
+Dashboard
+You reduce it to mainly:
+Core Screens
+A. Setup Screen
+Add field
+Search location
+Drop pin
+Select crop
+Name the field
+B. Analytics Screen
+This becomes the default experience after setup.
+This screen should contain:
+Growing degree day accumulation
+Historical comparison
+ET accumulation
+Chill hours (crop dependent)
+Crop-specific metrics
+Forecast/projection charts
+This is the core value proposition.
+3. Remove Low-Value Features
+A major theme was:
+stop building features farmers can already do themselves.
+So several features were deprioritized.
+Remove for now
+Irrigation scheduler
+Too complex and outside current scope.
+Profitability calculator
+Farmers already use spreadsheets/accounting tools.
+Ground truth logging/scouting
+Not enough value relative to effort.
+Complex groundwater integrations
+Too much maintenance risk.
+4. Make the UI Crop-Aware
+This is one of the smarter design decisions.
+The dashboard should change depending on the crop.
+Example
+Almonds
+Show:
+Chill hours
+Degree days
+ET accumulation
+Grapes
+Maybe:
+Heat stress
+Degree days
+ET
+No chill hours
+The interface becomes adaptive instead of static.
+That makes the app feel much more intelligent and relevant.
+5. Simplify the Information Architecture
+The current design sounds like it has:
+too many tabs
+too many sections
+too many concepts
+The new direction is closer to:
+Field Selector Dropdown
+    ↓
+Analytics Dashboard
+That’s basically the product.
+6. Make Field Switching Very Easy
+This became important once the map was minimized.
+Instead of navigating through maps:
+user selects a field from a dropdown
+all analytics instantly update
+Example:
+Current Field:
+▼ Green Valley Ranch
+▼ Fresno Vineyard
+▼ North Almond Block
++ Add New
+This replaces most of the map interaction.
+7. Add Optional Inputs Instead of Hardcoded Assumptions
+For budgeting/cost views:
+Do NOT try to infer:
+water allocation
+irrigation district data
+pricing
+Instead:
+let users optionally enter those values
+only render those panels if values exist
+This keeps the UI clean and avoids unreliable assumptions.
+8. Reduce Maintenance Burden in the Design
+This influenced the architecture heavily.
+The design should depend on:
+stable public APIs
+external maintained services
+Examples:
+OpenET
+Climate Toolbox API
+Avoid:
+custom maintained data pipelines
+fragile integrations
+manually maintained station systems
+That means the UI should also avoid features that require heavy backend infrastructure.
+9. Smaller, Cleaner, More Utility-Oriented UI
+The tone shifted from:
+“showcase dashboard”
+to:
+“actual working farmer tool”
+That means:
+fewer decorative sections
+fewer fake metrics
+fewer placeholder cards
+fewer oversized components
+More:
+dense useful charts
+practical comparisons
+immediate insights
+10. The Product Direction Became Much Clearer
+Before:
+Farm map platform
++ groundwater
++ scheduling
++ budgeting
++ stations
++ analytics
++ monitoring
+After:
+Drop a pin
+Select a crop
+Get automated crop analytics from reliable APIs
+That’s a much stronger product definition.
+It’s smaller, but much more believable and maintainable.
+ 
+
+ 

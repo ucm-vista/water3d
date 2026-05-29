@@ -1,0 +1,243 @@
+# Water 3D Project Meeting on App Design and Features
+
+Date/Time: May 21, 2026, 10:52 AM PDT
+
+--------------------------------------------------
+OVERALL SUMMARY
+--------------------------------------------------
+
+Emery and a colleague discussed refining the Water 3D app’s scope to focus on reliable, high-value features for farmers. The discussion emphasized shifting away from a map-centric interface and instead prioritizing analytics dashboards powered by stable external APIs such as OpenET and Catherine’s API. The goal is to create a maintainable, practical, and data-driven tool that farmers can use daily without unnecessary complexity.
+
+--------------------------------------------------
+KEY POINTS
+--------------------------------------------------
+
+- The app will focus only on essential, reliable features and avoid overly complex systems like irrigation scheduling.
+- User accounts will be anonymous by default.
+- Users will define field locations by dropping pins on a map during setup only.
+- The map will no longer be the center of the experience.
+- Most value will come from analytics dashboards and crop-specific insights.
+- ET data and environmental metrics will come from trusted APIs such as OpenET and Catherine’s API.
+- The team prefers relying on stable third-party APIs to reduce maintenance and improve reliability.
+
+--------------------------------------------------
+ACTION ITEMS
+--------------------------------------------------
+
+- Use AI-generated meeting summaries to improve note-taking and iteration speed.
+- Refine the UI in Stitch for faster development and cleaner components.
+- Implement field setup using map pin drops and crop selection.
+- Allow users to manage multiple fields.
+- Integrate ET and crop analytics from OpenET and Catherine’s API.
+- Remove or postpone irrigation scheduling and budgeting features until the analytics platform is fully solidified.
+
+--------------------------------------------------
+OPEN QUESTIONS
+--------------------------------------------------
+
+- How should the UI handle switching between multiple farms and crop types?
+- Should optional budgeting and water allocation inputs be supported?
+- Should groundwater monitoring and CIMIS integrations be added later?
+- How can the UI stay simple while still presenting meaningful analytics?
+
+--------------------------------------------------
+MAJOR PRODUCT DIRECTION SHIFT
+--------------------------------------------------
+
+The biggest change discussed was moving Water 3D away from being a “map application” and turning it into a focused analytics platform for farmers.
+
+Previously, the map was treated as the center of the experience. The meeting shifted the product direction heavily toward data analytics and utility-focused workflows.
+
+--------------------------------------------------
+1. REMOVE THE MAP AS THE MAIN EXPERIENCE
+--------------------------------------------------
+
+Previous Direction:
+- Large full-screen map
+- Dedicated map tab
+- Spatial UI as the primary interface
+- Pins and stations as major features
+
+New Direction:
+The map becomes a setup utility only.
+
+Users only need the map to:
+- Search for their farm
+- Drop a pin
+- Select a crop
+- Save the field
+
+After setup, the map largely disappears from the main workflow.
+
+Why:
+Farmers already know where their farms are. The map itself does not provide ongoing value.
+
+The real value comes from:
+- ET data
+- Growing degree days
+- Chill hours
+- Historical comparisons
+- Crop analytics
+
+The UI should therefore prioritize actionable data instead of geography.
+
+--------------------------------------------------
+2. MAKE ANALYTICS THE PRIMARY SCREEN
+--------------------------------------------------
+
+The analytics dashboard becomes the actual product experience.
+
+Core Screens:
+
+A. Setup Screen
+- Add field
+- Search location
+- Drop pin
+- Select crop
+- Name the field
+
+B. Analytics Dashboard
+- Growing degree day accumulation
+- Historical comparisons
+- ET accumulation
+- Chill hours (crop dependent)
+- Crop-specific metrics
+- Forecast and projection charts
+
+This dashboard becomes the app’s primary value proposition.
+
+--------------------------------------------------
+3. REMOVE LOW-VALUE FEATURES
+--------------------------------------------------
+
+Features Removed or Postponed:
+- Irrigation scheduler
+- Profitability calculator
+- Ground-truth logging and scouting
+- Complex groundwater integrations
+
+Reasons:
+- Too complex
+- Outside current scope
+- High maintenance burden
+- Existing tools already solve these problems
+
+--------------------------------------------------
+4. MAKE THE UI CROP-AWARE
+--------------------------------------------------
+
+The dashboard should dynamically adapt based on crop type.
+
+Example: Almonds
+- Chill hours
+- Degree days
+- ET accumulation
+
+Example: Grapes
+- Heat stress
+- Degree days
+- ET
+
+No chill-hour panels would appear for grapes.
+
+This makes the platform feel intelligent and relevant instead of static.
+
+--------------------------------------------------
+5. SIMPLIFY THE INFORMATION ARCHITECTURE
+--------------------------------------------------
+
+Old Structure:
+- Too many tabs
+- Too many sections
+- Too many concepts
+
+New Structure:
+
+Field Selector Dropdown
+        ↓
+Analytics Dashboard
+
+This becomes the core product workflow.
+
+--------------------------------------------------
+6. MAKE FIELD SWITCHING EXTREMELY EASY
+--------------------------------------------------
+
+Instead of navigating through maps, users simply select a field from a dropdown.
+
+Example:
+
+Current Field:
+▼ Green Valley Ranch
+▼ Fresno Vineyard
+▼ North Almond Block
++ Add New
+
+When a field changes, all analytics instantly update.
+
+--------------------------------------------------
+7. USE OPTIONAL INPUTS INSTEAD OF ASSUMPTIONS
+--------------------------------------------------
+
+Do NOT automatically infer:
+- Water allocation
+- Irrigation district information
+- Pricing data
+
+Instead:
+- Users can optionally enter those values
+- Related panels only appear if the data exists
+
+This keeps the UI clean and avoids unreliable assumptions.
+
+--------------------------------------------------
+8. REDUCE MAINTENANCE BURDEN
+--------------------------------------------------
+
+Preferred Dependencies:
+- OpenET
+- Climate Toolbox API
+
+Avoid:
+- Custom-maintained pipelines
+- Fragile integrations
+- Manually maintained station systems
+
+This directly influences both backend and frontend design decisions.
+
+--------------------------------------------------
+9. SMALLER, CLEANER, UTILITY-FOCUSED UI
+--------------------------------------------------
+
+Reduce:
+- Decorative sections
+- Fake metrics
+- Placeholder cards
+- Oversized UI components
+
+Increase:
+- Dense useful charts
+- Practical comparisons
+- Immediate insights
+
+The tone shifted away from a “showcase dashboard” toward a practical working tool for farmers.
+
+--------------------------------------------------
+10. CLEARER PRODUCT DEFINITION
+--------------------------------------------------
+
+Before:
+Farm map platform
++ groundwater
++ scheduling
++ budgeting
++ stations
++ analytics
++ monitoring
+
+After:
+Drop a pin
+Select a crop
+Get automated crop analytics from reliable APIs
+
+This creates a much smaller but significantly more believable and maintainable product direction.

@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Field Detail | Water 3D</title>
+<!-- Fonts and Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-container": "#1b2e1a",
+                    "surface-tint": "#506071",
+                    "surface-variant": "#e4e2de",
+                    "inverse-surface": "#30312e",
+                    "primary-container": "#1b2b3a",
+                    "on-tertiary-container": "#80977c",
+                    "on-primary-fixed-variant": "#384858",
+                    "secondary": "#934936",
+                    "surface-container-high": "#eae8e4",
+                    "tertiary": "#061908",
+                    "tertiary-fixed": "#d1e9cb",
+                    "on-error-container": "#93000a",
+                    "outline-variant": "#c4c6cc",
+                    "primary-fixed": "#d3e4f8",
+                    "surface-dim": "#dbdad6",
+                    "on-primary-container": "#8292a5",
+                    "on-tertiary-fixed": "#0d200d",
+                    "on-error": "#ffffff",
+                    "surface-container-lowest": "#ffffff",
+                    "on-tertiary-fixed-variant": "#374c36",
+                    "on-primary-fixed": "#0c1d2b",
+                    "on-surface": "#1b1c1a",
+                    "on-background": "#1b1c1a",
+                    "on-primary": "#ffffff",
+                    "surface-container": "#f0eeea",
+                    "surface-container-highest": "#e4e2de",
+                    "tertiary-fixed-dim": "#b5cdb0",
+                    "surface": "#fbf9f5",
+                    "on-secondary-container": "#783523",
+                    "on-tertiary": "#ffffff",
+                    "secondary-fixed": "#ffdbd2",
+                    "primary": "#051625",
+                    "error": "#ba1a1a",
+                    "primary-fixed-dim": "#b8c8dc",
+                    "secondary-fixed-dim": "#ffb4a1",
+                    "on-surface-variant": "#43474c",
+                    "background": "#fbf9f5",
+                    "secondary-container": "#ffa188",
+                    "error-container": "#ffdad6",
+                    "inverse-primary": "#b8c8dc",
+                    "on-secondary-fixed-variant": "#753321",
+                    "on-secondary": "#ffffff",
+                    "outline": "#74777c",
+                    "surface-container-low": "#f5f3ef",
+                    "inverse-on-surface": "#f2f0ec",
+                    "on-secondary-fixed": "#3c0800",
+                    "surface-bright": "#fbf9f5"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "container-padding-mobile": "16px",
+                    "card-gap": "16px",
+                    "container-padding-desktop": "32px",
+                    "gutter": "24px",
+                    "base": "8px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Inter"],
+                    "label-sm": ["Geist"],
+                    "data-display": ["Geist"],
+                    "headline-lg-mobile": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "body-md": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "600"}],
+                    "data-display": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                    "headline-md": ["20px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-background text-on-surface selection:bg-primary-fixed-dim min-h-screen flex flex-col font-body-md text-body-md overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-container-padding-desktop h-16 bg-surface border-b border-outline-variant">
+<div class="flex items-center gap-gutter">
+<span class="font-headline-md text-headline-md font-bold text-primary">Water 3D</span>
+<nav class="hidden md:flex gap-6 items-center h-full">
+<a class="text-on-surface-variant hover:text-primary transition-colors pb-1" href="#">Dashboard</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors pb-1" href="#">Irrigation</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors pb-1 text-on-surface-variant" href="#">Budget</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1" href="#">Fields</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden sm:block">
+<input class="bg-surface-container-low border border-outline-variant rounded-lg pl-10 pr-4 py-1.5 text-label-sm font-label-sm focus:outline-none focus:border-primary" placeholder="Search fields..." type="text"/>
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant scale-75">search</span>
+</div>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">account_circle</button>
+</div>
+</header>
+<div class="flex flex-1 pt-16 h-full">
+<!-- SideNavBar -->
+<aside class="hidden lg:flex flex-col h-[calc(100vh-64px)] w-64 p-base bg-surface-container-low border-r border-outline-variant sticky top-16">
+<div class="mb-8 px-2 py-4 border-b border-outline-variant">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-primary-container flex items-center justify-center text-primary-fixed">
+<span class="material-symbols-outlined">agriculture</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface">Main Ranch</p>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-wider">Central Valley District</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-surface-container-high transition-all rounded-lg font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                    Overview
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 bg-primary text-on-primary rounded-lg font-bold font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+                    Analytics
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-surface-container-high transition-all rounded-lg font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+                    Scheduler
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-surface-container-high transition-all rounded-lg font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined">payments</span>
+                    Budgeting
+                </a>
+</nav>
+<button class="mt-4 w-full bg-primary text-on-primary py-3 rounded-lg font-bold text-label-sm font-label-sm hover:opacity-90 active:scale-95 transition-all">
+                New Irrigation Cycle
+            </button>
+<div class="mt-auto space-y-1 border-t border-outline-variant pt-4">
+<a class="flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-surface-container-high transition-all rounded-lg font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined">settings</span>
+                    Settings
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-surface-container-high transition-all rounded-lg font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined">help</span>
+                    Support
+                </a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto bg-background p-container-padding-mobile md:p-container-padding-desktop">
+<!-- Page Header -->
+<div class="mb-gutter flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<nav class="flex gap-2 text-label-sm font-label-sm text-on-surface-variant mb-2 items-center">
+<span>Fields</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-primary">North Orchard 04</span>
+</nav>
+<h1 class="font-headline-lg text-headline-lg text-primary">North Orchard 04</h1>
+<p class="text-on-surface-variant">Almond Cluster • Block B-12 • 42.5 Acres</p>
+</div>
+<div class="flex gap-2">
+<button class="bg-surface-container-low border border-outline-variant px-4 py-2 rounded-lg font-label-sm text-label-sm hover:bg-surface-container-high transition-all">Export Data</button>
+<button class="bg-primary text-on-primary px-4 py-2 rounded-lg font-label-sm text-label-sm hover:opacity-90 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+                        Edit Details
+                    </button>
+</div>
+</div>
+<!-- Dashboard Grid -->
+<div class="grid grid-cols-12 gap-gutter">
+<!-- Phenology Timeline Card -->
+<div class="col-span-12 xl:col-span-8 bg-surface-container-lowest border border-outline-variant rounded p-6">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-md text-headline-md text-primary">Phenology Timeline</h3>
+<span class="bg-tertiary-container text-on-tertiary-container px-3 py-1 rounded font-label-sm text-label-sm">STAGE: MATURATION</span>
+</div>
+<div class="relative pt-10 pb-4">
+<!-- Connecting Line -->
+<div class="absolute top-[4.5rem] left-0 w-full h-[2px] bg-surface-container-highest"></div>
+<div class="absolute top-[4.5rem] left-0 w-[72%] h-[2px] bg-primary"></div>
+<div class="grid grid-cols-5 relative z-10">
+<!-- Stage 1 -->
+<div class="flex flex-col items-center">
+<div class="w-4 h-4 rounded-full bg-primary mb-3"></div>
+<span class="font-label-sm text-label-sm text-primary mb-1">Bud Break</span>
+<span class="text-[10px] text-on-surface-variant">Feb 12</span>
+</div>
+<!-- Stage 2 -->
+<div class="flex flex-col items-center">
+<div class="w-4 h-4 rounded-full bg-primary mb-3"></div>
+<span class="font-label-sm text-label-sm text-primary mb-1">Bloom</span>
+<span class="text-[10px] text-on-surface-variant">Mar 05</span>
+</div>
+<!-- Stage 3 -->
+<div class="flex flex-col items-center">
+<div class="w-4 h-4 rounded-full bg-primary mb-3"></div>
+<span class="font-label-sm text-label-sm text-primary mb-1">Fruit Set</span>
+<span class="text-[10px] text-on-surface-variant">Apr 15</span>
+</div>
+<!-- Stage 4 (Active) -->
+<div class="flex flex-col items-center relative">
+<div class="w-6 h-6 rounded-full bg-primary border-4 border-surface ring-2 ring-primary mb-2 -mt-1"></div>
+<span class="font-label-sm text-label-sm text-primary mb-1 font-bold">Maturation</span>
+<span class="text-[10px] text-primary font-bold">Today</span>
+<!-- Tooltip style indicator -->
+<div class="absolute -top-12 bg-primary text-on-primary text-[10px] px-2 py-1 rounded-sm">
+                                    CURRENT POSITION
+                                </div>
+</div>
+<!-- Stage 5 -->
+<div class="flex flex-col items-center">
+<div class="w-4 h-4 rounded-full bg-surface-container-highest mb-3"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant mb-1">Harvest</span>
+<span class="text-[10px] text-on-surface-variant">Est. Aug 28</span>
+</div>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-outline-variant grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<div class="flex flex-col">
+<span class="text-[10px] uppercase text-on-surface-variant font-bold tracking-widest mb-1">Pred. Harvest Date</span>
+<span class="font-data-display text-headline-md text-primary">Aug 28, 2024</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] uppercase text-on-surface-variant font-bold tracking-widest mb-1">Growing Degree Days</span>
+<span class="font-data-display text-headline-md text-primary">2,482 <span class="text-label-sm text-on-tertiary-container">+42 adj.</span></span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] uppercase text-on-surface-variant font-bold tracking-widest mb-1">Confidence Score</span>
+<span class="font-data-display text-headline-md text-primary">94%</span>
+</div>
+</div>
+</div>
+<!-- Chill Accumulation Gauge -->
+<div class="col-span-12 xl:col-span-4 bg-surface-container-lowest border border-outline-variant rounded p-6 flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-headline-md text-headline-md text-primary">Chill Accumulation</h3>
+<span class="material-symbols-outlined text-on-surface-variant">ac_unit</span>
+</div>
+<p class="text-on-surface-variant text-label-sm font-label-sm mb-6">Progress toward winter dormancy requirements</p>
+</div>
+<div class="relative flex items-center justify-center my-4">
+<svg class="w-48 h-48 -rotate-90">
+<circle class="text-surface-container-high" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-width="12"></circle>
+<circle class="text-primary" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" stroke-dasharray="502" stroke-dashoffset="150" stroke-width="12"></circle>
+</svg>
+<div class="absolute flex flex-col items-center">
+<span class="font-headline-lg text-headline-lg text-primary">720</span>
+<span class="text-on-surface-variant text-[10px] uppercase font-bold tracking-widest">Portions</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-4 rounded mt-4">
+<div class="flex justify-between mb-1">
+<span class="text-label-sm font-label-sm text-on-surface">Target: 800 Portions</span>
+<span class="text-label-sm font-label-sm text-primary">90%</span>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full">
+<div class="bg-primary h-1.5 rounded-full" style="width: 90%;"></div>
+</div>
+</div>
+</div>
+<!-- Environmental Stress Log -->
+<div class="col-span-12 bg-surface-container-lowest border border-outline-variant rounded overflow-hidden">
+<div class="p-6 border-b border-outline-variant flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+<div>
+<h3 class="font-headline-md text-headline-md text-primary">Environmental Stress Log</h3>
+<p class="text-on-surface-variant text-label-sm font-label-sm">Critical incidents detected in the last 14 days</p>
+</div>
+<div class="flex gap-2">
+<span class="flex items-center gap-1.5 bg-error-container text-on-error-container px-3 py-1 rounded font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">priority_high</span>
+                                2 ACTIVE ALERTS
+                            </span>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low">
+<th class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Incident Type</th>
+<th class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Intensity</th>
+<th class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Duration</th>
+<th class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Date &amp; Time</th>
+<th class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Impact Score</th>
+<th class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Incident 1 -->
+<tr class="hover:bg-surface-container transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-bold text-on-surface">ALRT: HEAT STRESS</span>
+</div>
+</td>
+<td class="px-6 py-4">104°F (Extreme)</td>
+<td class="px-6 py-4">4h 22m</td>
+<td class="px-6 py-4 text-on-surface-variant">Jul 22, 14:30</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="flex-1 h-2 bg-surface-container-high rounded-full overflow-hidden max-w-[80px]">
+<div class="bg-secondary h-full" style="width: 85%;"></div>
+</div>
+<span class="font-bold">8.5</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<button class="text-primary font-bold text-label-sm hover:underline">View Analysis</button>
+</td>
+</tr>
+<!-- Incident 2 -->
+<tr class="hover:bg-surface-container transition-colors bg-surface-container-low/30">
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+<span class="font-bold text-on-surface">ALRT: HIGH VPD</span>
+</div>
+</td>
+<td class="px-6 py-4">3.2 kPa (Severe)</td>
+<td class="px-6 py-4">6h 15m</td>
+<td class="px-6 py-4 text-on-surface-variant">Jul 21, 11:00</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="flex-1 h-2 bg-surface-container-high rounded-full overflow-hidden max-w-[80px]">
+<div class="bg-primary-container h-full" style="width: 60%;"></div>
+</div>
+<span class="font-bold">6.0</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<button class="text-primary font-bold text-label-sm hover:underline">View Analysis</button>
+</td>
+</tr>
+<!-- Incident 3 -->
+<tr class="hover:bg-surface-container transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="font-bold text-on-surface">ALRT: FROST</span>
+</div>
+</td>
+<td class="px-6 py-4">31°F (Moderate)</td>
+<td class="px-6 py-4">1h 45m</td>
+<td class="px-6 py-4 text-on-surface-variant">Jul 18, 04:15</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="flex-1 h-2 bg-surface-container-high rounded-full overflow-hidden max-w-[80px]">
+<div class="bg-error h-full" style="width: 30%;"></div>
+</div>
+<span class="font-bold">3.0</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<button class="text-primary font-bold text-label-sm hover:underline">View Analysis</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- 3D Hydrological View Placeholder (Asymmetric Pattern) -->
+<div class="col-span-12 lg:col-span-7 h-[400px] bg-surface-container-highest rounded-lg relative overflow-hidden group border border-outline-variant">
+<img alt="Satellite view of farm" class="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" data-alt="A highly detailed 3D topographic map of a modern almond orchard at sunrise. The field is overlayed with glowing cyan and emerald digital grids representing soil moisture levels. Low-angle morning sunlight casts long, dramatic shadows across the perfectly aligned rows of trees. The aesthetic is ultra-professional, combining natural agricultural beauty with surgical hydrological data visualization in a high-key light-mode palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBlGx0CihLUmHgdSLjRgYcSeSCRqz90IBQXRHmHnPv3BLCvpGdP3f690DxidRvnqhL_uuSmL5E7w3tIZpMHIDxA8TlodFFuClXYxzudg8XnPpsDOGfLo6d9FxbaP4v6MoXmOb6s3MPKN5w8ujXHRxWoYhWClFHYuJAw0Shs1urrhN7gtLT9QZoBsfl6xKirMLEFPvYwZOWL4nHXLP2U0am7Hsae3HJ4-VNWHNsSg90FQb95uupn5KIsi2tC7QbByScnjV2jIr4_Wfo"/>
+<!-- Floating Map Controls -->
+<div class="absolute bottom-4 right-4 flex flex-col gap-2">
+<button class="w-10 h-10 bg-primary/90 text-on-primary rounded flex items-center justify-center hover:bg-primary transition-all">
+<span class="material-symbols-outlined">layers</span>
+</button>
+<button class="w-10 h-10 bg-primary/90 text-on-primary rounded flex items-center justify-center hover:bg-primary transition-all">
+<span class="material-symbols-outlined">3d_rotation</span>
+</button>
+<div class="w-10 h-px bg-white/20 my-1"></div>
+<button class="w-10 h-10 bg-primary/90 text-on-primary rounded flex items-center justify-center hover:bg-primary transition-all">
+<span class="material-symbols-outlined">add</span>
+</button>
+<button class="w-10 h-10 bg-primary/90 text-on-primary rounded flex items-center justify-center hover:bg-primary transition-all">
+<span class="material-symbols-outlined">remove</span>
+</button>
+</div>
+<!-- Map Overlay Label -->
+<div class="absolute top-4 left-4 bg-primary/90 backdrop-blur-sm text-on-primary px-3 py-1.5 rounded-sm font-label-sm text-label-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">sensors</span>
+                        LIVE SENSOR NETWORK: ACTIVE
+                    </div>
+</div>
+<!-- Field Metadata/Stats Card -->
+<div class="col-span-12 lg:col-span-5 flex flex-col gap-gutter">
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-6 flex-1">
+<h4 class="font-headline-md text-headline-md text-primary mb-4">Soil Profile</h4>
+<div class="space-y-4">
+<div>
+<div class="flex justify-between text-label-sm font-label-sm mb-1">
+<span class="text-on-surface-variant">VWC (Volumetric Water Content)</span>
+<span class="text-primary">28.4%</span>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full">
+<div class="bg-primary h-1.5 rounded-full" style="width: 70%;"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-label-sm font-label-sm mb-1">
+<span class="text-on-surface-variant">Electrical Conductivity</span>
+<span class="text-primary">1.2 dS/m</span>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full">
+<div class="bg-tertiary-container h-1.5 rounded-full" style="width: 45%;"></div>
+</div>
+</div>
+<div class="pt-4 grid grid-cols-2 gap-4">
+<div class="p-3 bg-surface-container-low rounded border border-outline-variant">
+<p class="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">Soil Temp</p>
+<p class="font-data-display text-headline-md text-primary">68.2°F</p>
+</div>
+<div class="p-3 bg-surface-container-low rounded border border-outline-variant">
+<p class="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">Compaction</p>
+<p class="font-data-display text-headline-md text-primary">Med-Low</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Quick Actions Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-6">
+<h4 class="font-label-sm text-label-sm font-bold text-on-surface-variant mb-4 uppercase tracking-widest">Automated Interventions</h4>
+<div class="flex flex-col gap-2">
+<label class="flex items-center justify-between p-3 rounded border border-outline-variant cursor-pointer hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">thermostat_auto</span>
+<span class="font-label-sm text-label-sm">Frost Protection (Auto)</span>
+</div>
+<input checked="" class="rounded text-primary focus:ring-primary w-5 h-5" type="checkbox"/>
+</label>
+<label class="flex items-center justify-between p-3 rounded border border-outline-variant cursor-pointer hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">water_drop</span>
+<span class="font-label-sm text-label-sm">Pulse Irrigation</span>
+</div>
+<input class="rounded text-primary focus:ring-primary w-5 h-5" type="checkbox"/>
+</label>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer -->
+<footer class="w-full py-12 flex flex-col md:flex-row justify-between items-center bg-surface-container-highest dark:bg-inverse-surface mt-16 rounded-t-xl px-container-padding-desktop">
+<div class="mb-6 md:mb-0">
+<span class="font-headline-md text-headline-md text-primary">Water 3D</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-2">© 2024 Water 3D Hydrological Systems. All rights reserved.</p>
+</div>
+<div class="flex flex-wrap justify-center gap-gutter">
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Terms of Service</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">API Documentation</a>
+</div>
+</footer>
+</main>
+</div>
+<!-- Mobile Navigation -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-surface border-t border-outline-variant flex justify-around items-center h-16 z-50">
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-label-sm">Overview</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">agriculture</span>
+<span class="text-[10px] font-label-sm font-bold">Fields</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">calendar_month</span>
+<span class="text-[10px] font-label-sm">Schedule</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined">account_circle</span>
+<span class="text-[10px] font-label-sm">Profile</span>
+</button>
+</nav>
+<script>
+        // Simple micro-interaction for gauge hover
+        const gauge = document.querySelector('svg circle:last-child');
+        if (gauge) {
+            gauge.addEventListener('mouseenter', () => {
+                gauge.style.filter = 'drop-shadow(0 0 4px rgba(5, 22, 37, 0.2))';
+            });
+            gauge.addEventListener('mouseleave', () => {
+                gauge.style.filter = 'none';
+            });
+        }
+
+        // Add active state interactions
+        document.querySelectorAll('button, a').forEach(el => {
+            el.addEventListener('mousedown', () => {
+                el.style.transform = 'scale(0.98)';
+                el.style.transition = 'transform 0.1s';
+            });
+            el.addEventListener('mouseup', () => {
+                el.style.transform = 'scale(1)';
+            });
+            el.addEventListener('mouseleave', () => {
+                el.style.transform = 'scale(1)';
+            });
+        });
+    </script>
+</body></html>

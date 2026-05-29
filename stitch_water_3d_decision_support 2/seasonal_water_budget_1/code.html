@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Water 3D - Seasonal Water Budget</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Geist:wght@400;500;600;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fbf9f5;
+        }
+        .geist-font {
+            font-family: 'Geist', sans-serif;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#1b2e1a",
+                        "surface-tint": "#506071",
+                        "surface-variant": "#e4e2de",
+                        "inverse-surface": "#30312e",
+                        "primary-container": "#1b2b3a",
+                        "on-tertiary-container": "#80977c",
+                        "on-primary-fixed-variant": "#384858",
+                        "secondary": "#934936",
+                        "surface-container-high": "#eae8e4",
+                        "tertiary": "#061908",
+                        "tertiary-fixed": "#d1e9cb",
+                        "on-error-container": "#93000a",
+                        "outline-variant": "#c4c6cc",
+                        "primary-fixed": "#d3e4f8",
+                        "surface-dim": "#dbdad6",
+                        "on-primary-container": "#8292a5",
+                        "on-tertiary-fixed": "#0d200d",
+                        "on-error": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed-variant": "#374c36",
+                        "on-primary-fixed": "#0c1d2b",
+                        "on-surface": "#1b1c1a",
+                        "on-background": "#1b1c1a",
+                        "on-primary": "#ffffff",
+                        "surface-container": "#f0eeea",
+                        "surface-container-highest": "#e4e2de",
+                        "tertiary-fixed-dim": "#b5cdb0",
+                        "surface": "#fbf9f5",
+                        "on-secondary-container": "#783523",
+                        "on-tertiary": "#ffffff",
+                        "secondary-fixed": "#ffdbd2",
+                        "primary": "#051625",
+                        "error": "#ba1a1a",
+                        "primary-fixed-dim": "#b8c8dc",
+                        "secondary-fixed-dim": "#ffb4a1",
+                        "on-surface-variant": "#43474c",
+                        "background": "#fbf9f5",
+                        "secondary-container": "#ffa188",
+                        "error-container": "#ffdad6",
+                        "inverse-primary": "#b8c8dc",
+                        "on-secondary-fixed-variant": "#753321",
+                        "on-secondary": "#ffffff",
+                        "outline": "#74777c",
+                        "surface-container-low": "#f5f3ef",
+                        "inverse-on-surface": "#f2f0ec",
+                        "on-secondary-fixed": "#3c0800",
+                        "surface-bright": "#fbf9f5"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-padding-mobile": "16px",
+                        "card-gap": "16px",
+                        "container-padding-desktop": "32px",
+                        "gutter": "24px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "label-sm": ["Geist"],
+                        "data-display": ["Geist"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "600"}],
+                        "data-display": ["14px", {"lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                        "headline-md": ["20px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-container-padding-desktop h-16 bg-surface border-b border-outline-variant">
+<div class="flex items-center gap-base">
+<span class="font-headline-md text-headline-md font-bold text-primary">Water 3D</span>
+</div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-on-surface-variant pb-1 hover:text-primary transition-colors font-body-md text-body-md" href="#">Dashboard</a>
+<a class="text-on-surface-variant pb-1 hover:text-primary transition-colors font-body-md text-body-md" href="#">Irrigation</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-body-md text-body-md" href="#">Budget</a>
+<a class="text-on-surface-variant pb-1 hover:text-primary transition-colors font-body-md text-body-md" href="#">Fields</a>
+</nav>
+<div class="flex items-center gap-4">
+<div class="hidden md:flex items-center bg-surface-container-low px-3 py-1.5 rounded border border-outline-variant">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-48 text-on-surface" placeholder="Search data..." type="text"/>
+</div>
+<span class="material-symbols-outlined text-primary cursor-pointer" data-icon="notifications">notifications</span>
+<span class="material-symbols-outlined text-primary cursor-pointer" data-icon="account_circle">account_circle</span>
+</div>
+</header>
+<div class="flex pt-16 min-h-screen">
+<!-- SideNavBar -->
+<aside class="hidden lg:flex flex-col h-[calc(100vh-64px)] w-64 p-base bg-surface-container-low border-r border-outline-variant sticky top-16">
+<div class="px-4 py-6 mb-4">
+<div class="flex items-center gap-3 mb-1">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-fixed text-[20px]">agriculture</span>
+</div>
+<div>
+<h3 class="font-label-sm text-label-sm text-on-surface leading-tight">Main Ranch</h3>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-wider">Central Valley District</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-all font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+                    Overview
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-all font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined" data-icon="calendar_month">calendar_month</span>
+                    Scheduler
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 bg-primary text-on-primary rounded-lg font-bold font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+                    Budgeting
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-all font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined" data-icon="query_stats">query_stats</span>
+                    Analytics
+                </a>
+</nav>
+<div class="mt-auto pt-4 border-t border-outline-variant space-y-1">
+<button class="w-full mb-4 bg-primary text-on-primary py-2.5 rounded font-bold text-label-sm transition-all active:scale-95">
+                    New Irrigation Cycle
+                </button>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+                    Settings
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg font-label-sm text-label-sm" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+                    Support
+                </a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 p-container-padding-mobile md:p-container-padding-desktop">
+<!-- Header Section -->
+<div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-primary mb-1">Seasonal Water Budget</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Q3 Period: July 01 - Sept 30, 2024</p>
+</div>
+<div class="flex gap-2">
+<button class="flex items-center gap-2 px-4 py-2 border border-outline-variant rounded font-label-sm text-label-sm hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-[18px]">file_download</span>
+                        Export Report
+                    </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded font-label-sm text-label-sm hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+                        Adjust Allocation
+                    </button>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-12 gap-gutter">
+<!-- Allocation Progress Cards -->
+<div class="col-span-12 lg:col-span-4 bg-white border border-outline-variant rounded p-6">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-6 tracking-widest">Total Seasonal Progress</h3>
+<div class="flex flex-col items-center justify-center py-4">
+<div class="relative w-48 h-48">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-surface-container" cx="96" cy="96" fill="transparent" r="88" stroke="currentColor" stroke-width="12"></circle>
+<circle class="text-primary transition-all duration-1000" cx="96" cy="96" fill="transparent" r="88" stroke="currentColor" stroke-dasharray="552.92" stroke-dashoffset="138.23" stroke-width="12"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+<span class="font-headline-lg text-headline-lg text-primary">75%</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Consumed</span>
+</div>
+</div>
+<div class="mt-8 w-full grid grid-cols-2 gap-4">
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Used</p>
+<p class="font-headline-md text-headline-md text-primary">1,240 <span class="text-sm font-normal">AF</span></p>
+</div>
+<div class="text-right">
+<p class="font-label-sm text-label-sm text-on-surface-variant">Budget</p>
+<p class="font-headline-md text-headline-md text-primary">1,650 <span class="text-sm font-normal">AF</span></p>
+</div>
+</div>
+</div>
+</div>
+<!-- Cumulative Trend Chart -->
+<div class="col-span-12 lg:col-span-8 bg-white border border-outline-variant rounded p-6">
+<div class="flex justify-between items-center mb-8">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">Cumulative Use Trend</h3>
+<div class="flex gap-4">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-primary"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">2024 Actual</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-surface-variant"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Historical Avg</span>
+</div>
+</div>
+</div>
+<!-- Mock Line Chart -->
+<div class="h-64 flex items-end gap-1 px-2 relative">
+<div class="absolute inset-0 flex flex-col justify-between border-l border-b border-outline-variant">
+<div class="w-full border-t border-dashed border-outline-variant h-0"></div>
+<div class="w-full border-t border-dashed border-outline-variant h-0"></div>
+<div class="w-full border-t border-dashed border-outline-variant h-0"></div>
+</div>
+<!-- Drawing a simulated path with bars for simplicity but styling it as cumulative steps -->
+<div class="flex-1 flex flex-col justify-end gap-1 h-full relative group">
+<div class="w-full bg-surface-variant h-[20%] rounded-t-sm"></div>
+<div class="w-full bg-primary h-[25%] rounded-t-sm"></div>
+<p class="absolute -bottom-6 left-1/2 -translate-x-1/2 font-label-sm text-[10px] text-on-surface-variant">JUL</p>
+</div>
+<div class="flex-1 flex flex-col justify-end gap-1 h-full relative group">
+<div class="w-full bg-surface-variant h-[45%] rounded-t-sm"></div>
+<div class="w-full bg-primary h-[50%] rounded-t-sm"></div>
+<p class="absolute -bottom-6 left-1/2 -translate-x-1/2 font-label-sm text-[10px] text-on-surface-variant">AUG</p>
+</div>
+<div class="flex-1 flex flex-col justify-end gap-1 h-full relative group">
+<div class="w-full bg-surface-variant h-[70%] rounded-t-sm"></div>
+<div class="w-full bg-primary h-[75%] rounded-t-sm"></div>
+<p class="absolute -bottom-6 left-1/2 -translate-x-1/2 font-label-sm text-[10px] text-on-surface-variant">SEP</p>
+</div>
+<div class="flex-1 flex flex-col justify-end gap-1 h-full relative opacity-40">
+<div class="w-full bg-surface-variant h-[90%] rounded-t-sm"></div>
+<p class="absolute -bottom-6 left-1/2 -translate-x-1/2 font-label-sm text-[10px] text-on-surface-variant">OCT</p>
+</div>
+<div class="flex-1 flex flex-col justify-end gap-1 h-full relative opacity-40">
+<div class="w-full bg-surface-variant h-[95%] rounded-t-sm"></div>
+<p class="absolute -bottom-6 left-1/2 -translate-x-1/2 font-label-sm text-[10px] text-on-surface-variant">NOV</p>
+</div>
+</div>
+</div>
+<!-- Sources Breakdown Table -->
+<div class="col-span-12 bg-white border border-outline-variant rounded overflow-hidden">
+<div class="px-6 py-4 border-b border-outline-variant bg-surface-container-low flex justify-between items-center">
+<h3 class="font-label-sm text-label-sm text-on-surface font-bold uppercase tracking-widest">Water Delivery by Source</h3>
+<div class="text-on-surface-variant text-xs">Unit: Acre-Feet (AF)</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low">
+<th class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase border-b border-outline-variant">Water Source</th>
+<th class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase border-b border-outline-variant">Allocation</th>
+<th class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase border-b border-outline-variant">Delivered YTD</th>
+<th class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase border-b border-outline-variant">Remaining</th>
+<th class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase border-b border-outline-variant">Avg. Flow Rate</th>
+<th class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase border-b border-outline-variant text-right">Status</th>
+</tr>
+</thead>
+<tbody class="geist-font">
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 border-b border-outline-variant">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="water">water</span>
+<span class="font-medium text-on-surface">District Water (Tier 1)</span>
+</div>
+</td>
+<td class="px-6 py-4 border-b border-outline-variant text-on-surface">800.00</td>
+<td class="px-6 py-4 border-b border-outline-variant text-on-surface">745.20</td>
+<td class="px-6 py-4 border-b border-outline-variant text-on-surface">54.80</td>
+<td class="px-6 py-4 border-b border-outline-variant text-on-surface">4.2 CFS</td>
+<td class="px-6 py-4 border-b border-outline-variant text-right">
+<span class="bg-secondary-container text-on-secondary-fixed-variant px-2 py-0.5 rounded font-label-sm text-[10px]">CRITICAL LOW</span>
+</td>
+</tr>
+<tr class="bg-surface-container-lowest hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 border-b border-outline-variant">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="valve">valve</span>
+<span class="font-medium text-on-surface">Ag-Well #04</span>
+</div>
+</td>
+<td class="px-6 py-4 border-b border-outline-variant text-on-surface">500.00</td>
+<td class="px-6 py-4 border-b border-outline-variant text-on-surface">290.50</td>
+<td class="px-6 py-4 border-b border-outline-variant text-on-surface">209.50</td>
+<td class="px-6 py-4 border-b border-outline-variant text-on-surface">2.8 CFS</td>
+<td class="px-6 py-4 border-b border-outline-variant text-right">
+<span class="bg-tertiary-fixed text-on-tertiary-fixed-variant px-2 py-0.5 rounded font-label-sm text-[10px]">OPTIMAL</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-4 border-b border-outline-variant">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="recycling">recycling</span>
+<span class="font-medium text-on-surface">Recycled/Tailwater</span>
+</div>
+</td>
+<td class="px-6 py-4 border-b border-outline-variant text-on-surface">350.00</td>
+<td class="px-6 py-4 border-b border-outline-variant text-on-surface">204.30</td>
+<td class="px-6 py-4 border-b border-outline-variant text-on-surface">145.70</td>
+<td class="px-6 py-4 border-b border-outline-variant text-on-surface">1.5 CFS</td>
+<td class="px-6 py-4 border-b border-outline-variant text-right">
+<span class="bg-tertiary-fixed text-on-tertiary-fixed-variant px-2 py-0.5 rounded font-label-sm text-[10px]">STABLE</span>
+</td>
+</tr>
+</tbody>
+<tfoot>
+<tr class="bg-surface-container-high">
+<td class="px-6 py-4 font-bold text-on-surface">Total Season</td>
+<td class="px-6 py-4 font-bold text-on-surface">1,650.00</td>
+<td class="px-6 py-4 font-bold text-on-surface">1,240.00</td>
+<td class="px-6 py-4 font-bold text-on-surface">410.00</td>
+<td class="px-6 py-4 font-bold text-on-surface">8.5 CFS</td>
+<td class="px-6 py-4 text-right"></td>
+</tr>
+</tfoot>
+</table>
+</div>
+</div>
+<!-- Secondary Analysis Widgets -->
+<div class="col-span-12 md:col-span-6 bg-white border border-outline-variant rounded p-6">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-4 tracking-widest">Hydrological Map Focus</h3>
+<div class="relative h-48 bg-surface-container-high rounded overflow-hidden">
+<img class="w-full h-full object-cover grayscale opacity-50" data-alt="A sophisticated satellite visualization of expansive agricultural farmlands in the Central Valley, shown from a high-altitude perspective. The landscape is divided into a geometric grid of fields with varying shades of earthy greens and deep browns, reflecting different moisture levels. Overlaid on the terrain is a professional hydrological heat map consisting of subtle, glowing blue and amber contours that represent ground moisture concentration. The lighting is crisp and even, emphasizing a precise, clinical, and data-driven agricultural mapping style." data-location="Central Valley" src="https://lh3.googleusercontent.com/aida-public/AB6AXuChG8g-nYmrHKmJkRmmS6GgcfjBgtc3jM3FW-hCTTMVghRL5mt1jtL-YfTcudmV3p_RsbakPvqVEKNEsokwDIE-0WncBQGc8PfjTPVFzn1m1QMhko1c8ttXfMk8xd3Xb_Gq54ACEeZen5WdimvXxRXvyqNQVeN2yyROp8Hfaf-jsv1K04CikBZGdFkV2LakbYm-NTMRh_HChsEnGhaj5W11TL7IkIVLtYv1KAy7Taz78VhTlnGd9rBv8Sg-D_dtDj5m2GkeNj7yyY4"/>
+<div class="absolute inset-0 bg-primary/10"></div>
+<div class="absolute bottom-4 right-4 flex flex-col gap-2">
+<button class="w-8 h-8 bg-primary/90 text-white flex items-center justify-center rounded-sm hover:bg-primary transition-colors">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+<button class="w-8 h-8 bg-primary/90 text-white flex items-center justify-center rounded-sm hover:bg-primary transition-colors">
+<span class="material-symbols-outlined text-[18px]">remove</span>
+</button>
+</div>
+</div>
+</div>
+<div class="col-span-12 md:col-span-6 bg-white border border-outline-variant rounded p-6">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant uppercase mb-4 tracking-widest">Efficiency Metrics</h3>
+<div class="space-y-4">
+<div>
+<div class="flex justify-between mb-1">
+<span class="font-label-sm text-label-sm text-on-surface">Infiltration Rate</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">88%</span>
+</div>
+<div class="h-2 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-primary" style="width: 88%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between mb-1">
+<span class="font-label-sm text-label-sm text-on-surface">Evapotranspiration (ETc)</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">12.4 mm/day</span>
+</div>
+<div class="h-2 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-secondary" style="width: 65%"></div>
+</div>
+</div>
+<div class="pt-4 border-t border-outline-variant">
+<div class="flex items-center gap-2 text-secondary font-bold">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+<span class="font-label-sm text-label-sm uppercase">ALRT: High VPD Detected</span>
+</div>
+<p class="mt-1 text-[11px] text-on-surface-variant leading-relaxed">Vapor Pressure Deficit exceeds 2.5kPa in Sector 4. High transpiration stress likely in 14-18 hours.</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Footer -->
+<footer class="w-full py-8 px-container-padding-desktop flex flex-col md:flex-row justify-between items-center bg-surface-container-highest border-t border-outline-variant">
+<div class="mb-4 md:mb-0">
+<span class="font-headline-md text-headline-md text-primary font-bold">Water 3D</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-2">© 2024 Water 3D Hydrological Systems. All rights reserved.</p>
+</div>
+<div class="flex gap-6">
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy Policy</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Terms of Service</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors" href="#">API Documentation</a>
+</div>
+</footer>
+<script>
+        // Simple micro-interaction for interactions scale
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('mousedown', () => {
+                btn.classList.add('scale-95');
+            });
+            btn.addEventListener('mouseup', () => {
+                btn.classList.remove('scale-95');
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.classList.remove('scale-95');
+            });
+        });
+    </script>
+</body></html>
