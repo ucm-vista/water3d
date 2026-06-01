@@ -70,6 +70,7 @@ export const openEtConfig = {
   defaultReferenceEt: (import.meta.env.VITE_OPENET_REFERENCE_ET ?? "gridMET") as OpenEtReferenceEt,
   defaultUnits: (import.meta.env.VITE_OPENET_UNITS ?? "mm") as OpenEtUnits,
   defaultVersion: Number(import.meta.env.VITE_OPENET_VERSION ?? 2.1),
+  maxAvailableDate: import.meta.env.VITE_OPENET_MAX_AVAILABLE_DATE || "2025-12-31",
   defaultInterval: "daily" as OpenEtInterval,
   endpoints: {
     accountStatus: "/account/status",
@@ -86,6 +87,14 @@ export const openEtConfig = {
     optionalForWater3d: ["ETof", "NDVI", "MODEL_COUNT"] satisfies OpenEtVariable[],
   },
 };
+
+export function getOpenEtVariableVersion(variable: OpenEtVariable): number {
+  if (variable === "ETo" || variable === "ETr" || variable === "PR") {
+    return 1.0;
+  }
+
+  return openEtConfig.defaultVersion;
+}
 
 export function getOpenEtUrl(endpoint: keyof typeof openEtConfig.endpoints) {
   const baseUrl = openEtConfig.requestBaseUrl;

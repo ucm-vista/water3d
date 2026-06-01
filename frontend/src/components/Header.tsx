@@ -1,4 +1,5 @@
-import { Bell, Rows3, UserCircle } from "lucide-react";
+import { Bell, Rows3 } from "lucide-react";
+import type { AuthSession } from "../backend/authRepository";
 import type { FieldConfig } from "../types/domain";
 import { AuthStatus } from "./AuthStatus";
 
@@ -6,11 +7,14 @@ interface HeaderProps {
   fields: FieldConfig[];
   selectedFieldId: string;
   activeView: string;
+  authSession: AuthSession;
   onFieldChange: (fieldId: string) => void;
   onViewChange: (view: string) => void;
+  onLogin: (email: string, password: string) => Promise<void>;
+  onLogout: () => void;
 }
 
-export function Header({ fields, selectedFieldId, activeView, onFieldChange, onViewChange }: HeaderProps) {
+export function Header({ fields, selectedFieldId, activeView, authSession, onFieldChange, onViewChange, onLogin, onLogout }: HeaderProps) {
   return (
     <header className="topbar">
       <div className="brand">Water 3D</div>
@@ -27,9 +31,8 @@ export function Header({ fields, selectedFieldId, activeView, onFieldChange, onV
           <Rows3 size={16} />
           Manage Fields
         </button>
-        <AuthStatus />
         <Bell size={22} />
-        <UserCircle size={24} />
+        <AuthStatus session={authSession} onLogin={onLogin} onLogout={onLogout} />
       </div>
     </header>
   );

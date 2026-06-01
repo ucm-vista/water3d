@@ -6,6 +6,7 @@ export interface AuthSession {
   isAuthenticated: boolean;
   user: AuthModel | null;
   token: string;
+  email?: string;
 }
 
 export interface LoginCredentials {
@@ -29,6 +30,7 @@ export function getAuthSession(): AuthSession {
     isAuthenticated: pb.authStore.isValid,
     user: pb.authStore.model,
     token: pb.authStore.token,
+    email: getUserEmail(pb.authStore.model),
   };
 }
 
@@ -45,4 +47,25 @@ export async function loginWithPassword(credentials: LoginCredentials): Promise<
 export function logout(): void {
   if (!isPocketBaseEnabled()) return;
   getPocketBaseClient().authStore.clear();
+}
+
+export function onAuthChange(callback: (session: AuthSession) => void): () => void {
+  if (!isPocketBaseEnabled()) {
+    return () => undefined;
+  }
+
+  const unsubscribe = getPocketBaseClient().authStore.onChange(() => {
+    callback(getAuthSession());
+  }, true);
+
+  return unsubscribe;
+}
+
+function getUserEmail(user: AuthModel | null): string | undefined {
+  if (!user || typeof user !== "object") {
+    return undefined;
+  }
+
+  const maybeEmail = (user as Record<string, unknown>).email;
+  return typeof maybeEmail === "string" ? maybeEmail : undefined;
 }

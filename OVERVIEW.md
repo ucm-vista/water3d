@@ -23,6 +23,26 @@ The frontend now calls Mapbox Search, Mapbox maps/static thumbnails, OpenET thro
 - VPD/stress uses local humidity mock values; there is no live humidity/dewpoint provider.
 - Chill and frost/heat signals use daily interpolated/mock weather; no hourly temperature provider exists.
 
+### WIP Data Source Review
+Treat any UI display backed by mock, fallback, static, or locally transformed data as WIP, even when the surrounding panel is visible in the app.
+
+| Data source or display | Current state | WIP reason |
+| --- | --- | --- |
+| OpenET ET/ETo/precip | Partially live when `VITE_OPENET_API_KEY` is configured; otherwise local demo data. | OpenET is merged into mock weather dates, requests are capped by availability, and the display is point-based rather than field-boundary averaged. |
+| Daily historical weather | Mock data from `frontend/src/data/weather.ts`. | No live weather/climate provider owns canonical dates, min/max temperature, precipitation, ETo, humidity, quality flags, or station/grid metadata. |
+| Forecast weather | Mock data from `frontend/src/data/weather.ts`. | No forecast provider or forecast horizon contract is implemented. |
+| ET forecast chart | Mixed/derived data in `Dashboard.tsx`. | Chart title implies stable feeds, but ETc is calculated from local crop coefficients, weather is mock-backed, and historical range is a placeholder transform. |
+| Historical ET comparison | Local `ETo * 0.9` transform in `Dashboard.tsx` and mock provider output. | No historical baseline provider, climatology, prior-year comparison, or provider metadata exists. |
+| Applied water / irrigation depletion inputs | `mockAppliedWaterMm` from `frontend/src/data/weather.ts`. | No user entry, controller API, meter telemetry, or pump telemetry source exists; outputs using applied water are demo-only. |
+| GDD accumulation | Calculated from mock/interpolated daily temperatures. | Calculation logic exists, but the source temperatures are not live or provider-qualified. |
+| Chill portions | Calculated from mock/interpolated daily temperatures. | No hourly temperature provider exists, so chill, frost, and heat signals are not production-grade. |
+| Hydrological stress / VPD | Calculated from mock humidity values and labeled `Climate API` in the UI. | No live humidity/dewpoint provider exists; the metric card display should be treated as WIP despite the API label. |
+| Soil properties | Live through NRCS SDA when enabled, with local defaults as fallback. | Soil texture/AWHC/map-unit fields are partially live, but fallback displays remain demo/default values when the lookup is unavailable. |
+| Weather cell | Static placeholder such as `Grid ID #4829`. | No weather grid/station/cell lookup provider is implemented. |
+| Elevation | Static/defaulted, currently `0 ft` from NRCS lookup or `342 ft` local default. | Elevation is not returned by soil lookup; a terrain/elevation provider is still needed. |
+| Field records | localStorage/default field data. | PocketBase auth/storage is scaffolded but disabled; default field and persisted fields remain local. |
+| Dashboard subtitle and controls | Static labels such as `Block A-12`, `Active Season`, `Last 30 Days`, and `Export Data`. | These displays are not bound to real block metadata, date-range selection, season state, or export implementation. |
+
 ## Active v1 Data Needs
 The current product direction is setup plus analytics. APIs should support dropping a field pin, selecting a crop, switching fields, detecting soil, and generating ET/GDD/chill/stress analytics. Scheduler, budgeting, scouting, groundwater, and station-management data remain deferred.
 
@@ -103,6 +123,7 @@ Preferred request mode:
 
 Current frontend gap:
 - OpenET data is merged into mock weather dates. A real weather provider should own the canonical date range.
+- OpenET requests are capped by `VITE_OPENET_MAX_AVAILABLE_DATE` because the API availability window can lag the app's current/demo season.
 - Historical baseline is still a placeholder.
 - ET represents the saved field point, not a full field boundary average.
 

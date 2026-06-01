@@ -7,6 +7,7 @@ import { cropOptions } from "../data/crops";
 import { mapboxConfig } from "../config/mapbox";
 import type { CropId, FieldConfig } from "../types/domain";
 import { debugDataSource } from "../utils/debug";
+import { toIsoDate } from "../utils/dateRange";
 
 const FieldSetupMap = lazy(() => import("./FieldSetupMap"));
 
@@ -153,7 +154,7 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, field }: Se
       drainageClass: detectedProperties.drainageClass,
       rootDepthM: crop.rootDepthM,
       madFraction: crop.madFraction,
-      stageStartDate: field?.stageStartDate ?? "2026-02-01",
+      stageStartDate: field?.stageStartDate ?? toIsoDate(new Date()),
       irrigationEfficiency: field?.irrigationEfficiency ?? 0.85,
       weatherCell: detectedProperties.weatherCell,
       elevationFt: detectedProperties.elevationFt,

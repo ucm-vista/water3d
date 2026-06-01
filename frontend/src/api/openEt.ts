@@ -1,4 +1,4 @@
-import { getOpenEtUrl, openEtConfig, openEtVariables, type OpenEtInterval, type OpenEtVariable } from "../config/openet";
+import { getOpenEtUrl, getOpenEtVariableVersion, openEtConfig, openEtVariables, type OpenEtInterval, type OpenEtVariable } from "../config/openet";
 import type { Coordinates, EtDataRequest, EtDataResponse, EtDataVariable, EtProvider } from "./contracts";
 
 export interface OpenEtPointTimeseriesRequest extends Coordinates {
@@ -29,7 +29,7 @@ export function buildOpenEtPointTimeseriesBody(request: OpenEtPointTimeseriesReq
     variable: request.variable,
     reference_et: openEtConfig.defaultReferenceEt,
     units: openEtConfig.defaultUnits,
-    version: openEtConfig.defaultVersion,
+    version: getOpenEtVariableVersion(request.variable),
     file_format: "JSON",
   };
 }
@@ -77,6 +77,30 @@ function normalizeDate(value: unknown): string | undefined {
   return match?.[0];
 }
 
+function compareIsoDate(a: string, b: string): number {
+  return a.localeCompare(b);
+}
+
+export function getSupportedOpenEtDateRange(request: EtDataRequest): { startDate: string; endDate: string } {
+  const maxAvailableDate = openEtConfig.maxAvailableDate;
+
+  if (!maxAvailableDate) {
+    return {
+      startDate: request.startDate,
+      endDate: request.endDate,
+    };
+  }
+
+  if (compareIsoDate(request.startDate, maxAvailableDate) > 0) {
+    throw new Error(`OpenET data is currently configured through ${maxAvailableDate}; requested range starts ${request.startDate}.`);
+  }
+
+  return {
+    startDate: request.startDate,
+    endDate: compareIsoDate(request.endDate, maxAvailableDate) > 0 ? maxAvailableDate : request.endDate,
+  };
+}
+
 function extractSeriesRows(payload: unknown): Array<Record<string, unknown>> {
   if (!payload || typeof payload !== "object") {
     return [];
@@ -118,6 +142,7 @@ export class OpenEtProvider implements EtProvider {
     }
 
     const variables = openEtConfig.variables.requiredForWater3d;
+    const dateRange = getSupportedOpenEtDateRange(request);
     const responses = await Promise.allSettled(
       variables.map(async (variable) => {
         const response = await fetch(openEtApi.urls.pointTimeseries, {
@@ -130,13 +155,15 @@ export class OpenEtProvider implements EtProvider {
           body: JSON.stringify(
             buildOpenEtPointTimeseriesBody({
               ...request,
+              ...dateRange,
               variable,
             }),
           ),
         });
 
         if (!response.ok) {
-          throw new Error(`OpenET ${variable} request failed with ${response.status}.`);
+          const detail = await response.text().catch(() => "");
+          throw new Error(`OpenET ${variable} request failed with ${response.status}${detail ? `: ${detail.slice(0, 240)}` : ""}.`);
         }
 
         return {

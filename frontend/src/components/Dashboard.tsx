@@ -10,12 +10,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { mockAppliedWaterMm, mockWeatherRecords } from "../data/weather";
-import { openEtApi, openEtProvider } from "../api";
+import { getSupportedOpenEtDateRange, openEtApi, openEtProvider } from "../api/openEt";
 import { buildAnalyticsSnapshot } from "../calcs/analytics";
 import { cropProfiles } from "../data/crops";
+import { mockWeatherRecords } from "../data/weather";
 import type { FieldConfig, WeatherRecord } from "../types/domain";
+import type { EtDataResponse } from "../api/contracts";
 import { debugDataSource } from "../utils/debug";
+import { getRollingDateRange } from "../utils/dateRange";
 import { MetricCard } from "./MetricCard";
 import { useEffect, useMemo, useState } from "react";
 
@@ -24,6 +26,7 @@ interface DashboardProps {
 }
 
 type EtChartMode = "daily" | "cumulative";
+type EtRecord = EtDataResponse["records"][number];
 
 function inches(mm: number): string {
   return `${(mm / 25.4).toFixed(1)}"`;
@@ -33,62 +36,15 @@ function formatDateLabel(date: string): string {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit" }).format(new Date(`${date}T00:00:00`));
 }
 
-function dateToUtcMs(date: string) {
-  return new Date(`${date}T00:00:00Z`).getTime();
-}
-
-function addDays(date: string, days: number) {
-  const next = new Date(`${date}T00:00:00Z`);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next.toISOString().slice(0, 10);
-}
-
-function interpolateNumber(start: number | undefined, end: number | undefined, ratio: number) {
-  if (typeof start !== "number" || typeof end !== "number") {
-    return start ?? end;
-  }
-
-  return Number((start + (end - start) * ratio).toFixed(2));
-}
-
-function expandWeatherRecordsDaily(records: WeatherRecord[]) {
-  const sorted = [...records].sort((a, b) => a.date.localeCompare(b.date));
-  const expanded: WeatherRecord[] = [];
-
-  for (let index = 0; index < sorted.length - 1; index += 1) {
-    const current = sorted[index];
-    const next = sorted[index + 1];
-    const daySpan = Math.max(1, Math.round((dateToUtcMs(next.date) - dateToUtcMs(current.date)) / 86_400_000));
-
-    for (let offset = 0; offset < daySpan; offset += 1) {
-      const ratio = offset / daySpan;
-      const date = addDays(current.date, offset);
-
-      expanded.push({
-        date,
-        tminC: interpolateNumber(current.tminC, next.tminC, ratio) ?? current.tminC,
-        tmaxC: interpolateNumber(current.tmaxC, next.tmaxC, ratio) ?? current.tmaxC,
-        precipMm: offset === 0 ? current.precipMm : 0,
-        etoMm: interpolateNumber(current.etoMm, next.etoMm, ratio) ?? current.etoMm,
-        rhMin: interpolateNumber(current.rhMin, next.rhMin, ratio),
-        rhMax: interpolateNumber(current.rhMax, next.rhMax, ratio),
-        source: current.source,
-      });
-    }
-  }
-
-  const last = sorted.at(-1);
-  if (last) {
-    expanded.push(last);
-  }
-
-  return expanded;
+function isOpenEtAvailabilityError(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith("OpenET data is currently configured through");
 }
 
 export function Dashboard({ field }: DashboardProps) {
-  const baseWeatherRecords = useMemo(() => expandWeatherRecordsDaily(mockWeatherRecords), []);
-  const [weatherRecords, setWeatherRecords] = useState<WeatherRecord[]>(baseWeatherRecords);
-  const [dataSourceLabel, setDataSourceLabel] = useState(openEtApi.enabled ? "OpenET loading" : "Local demo data");
+  const dateRange = useMemo(() => getRollingDateRange(30), []);
+  const [weatherRecords] = useState<WeatherRecord[]>(mockWeatherRecords);
+  const [etRecords, setEtRecords] = useState<EtRecord[]>(() => buildDemoEtRecords());
+  const [dataSourceLabel, setDataSourceLabel] = useState(openEtApi.enabled ? "OpenET loading" : "Demo data");
   const [dataWarning, setDataWarning] = useState<string | null>(null);
   const [etChartMode, setEtChartMode] = useState<EtChartMode>("cumulative");
   const crop = cropProfiles[field.cropId];
@@ -98,10 +54,10 @@ export function Dashboard({ field }: DashboardProps) {
 
     async function loadOpenEtData() {
       if (!openEtApi.enabled) {
-        setWeatherRecords(baseWeatherRecords);
-        setDataSourceLabel("Local demo data");
+        setEtRecords(buildDemoEtRecords());
+        setDataSourceLabel("Demo data");
         setDataWarning(null);
-        debugDataSource("openet", "disabled; using local demo data", {
+        debugDataSource("openet", "disabled; no live ET data loaded", {
           enabled: false,
           fieldId: field.id,
         });
@@ -109,6 +65,14 @@ export function Dashboard({ field }: DashboardProps) {
       }
 
       try {
+        const openEtDateRange = getSupportedOpenEtDateRange({
+          cropId: field.cropId,
+          lat: field.lat,
+          lon: field.lon,
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+        });
+
         setDataSourceLabel("OpenET loading");
         debugDataSource("openet", "request started", {
           enabled: true,
@@ -116,56 +80,41 @@ export function Dashboard({ field }: DashboardProps) {
           cropId: field.cropId,
           lat: field.lat,
           lon: field.lon,
-          startDate: baseWeatherRecords[0].date,
-          endDate: baseWeatherRecords.at(-1)?.date ?? baseWeatherRecords[0].date,
+          startDate: openEtDateRange.startDate,
+          endDate: openEtDateRange.endDate,
           requestUrl: openEtApi.urls.pointTimeseries,
         });
         const response = await openEtProvider.getEtData({
           cropId: field.cropId,
           lat: field.lat,
           lon: field.lon,
-          startDate: baseWeatherRecords[0].date,
-          endDate: baseWeatherRecords.at(-1)?.date ?? baseWeatherRecords[0].date,
+          startDate: openEtDateRange.startDate,
+          endDate: openEtDateRange.endDate,
         });
 
         if (ignore) {
           return;
         }
 
-        const openEtByDate = new Map(response.records.map((record) => [record.date, record]));
-        const mergedRecords = baseWeatherRecords.map((record) => {
-          const openEtRecord = openEtByDate.get(record.date);
-
-          return {
-            ...record,
-            etoMm: openEtRecord?.etoMm ?? record.etoMm,
-            precipMm: openEtRecord?.precipMm ?? record.precipMm,
-            etActualMm: openEtRecord?.etActualMm,
-            ndvi: openEtRecord?.ndvi,
-            modelCount: openEtRecord?.modelCount,
-          };
-        });
-
-        setWeatherRecords(mergedRecords);
-        setDataSourceLabel("OpenET + local weather");
+        setEtRecords(response.records);
+        setDataSourceLabel("OpenET live");
         setDataWarning(null);
-        debugDataSource("openet", "records merged into dashboard", {
+        debugDataSource("openet", "live records loaded into dashboard", {
           fieldId: field.id,
           returnedRecords: response.records.length,
-          mergedRecords: mergedRecords.length,
-          recordsWithActualEt: mergedRecords.filter((record) => typeof record.etActualMm === "number").length,
-          recordsWithReferenceEt: mergedRecords.filter((record) => typeof record.etoMm === "number").length,
-          recordsWithPrecip: mergedRecords.filter((record) => typeof record.precipMm === "number").length,
+          recordsWithActualEt: response.records.filter((record) => typeof record.etActualMm === "number").length,
+          recordsWithReferenceEt: response.records.filter((record) => typeof record.etoMm === "number").length,
+          recordsWithPrecip: response.records.filter((record) => typeof record.precipMm === "number").length,
         });
       } catch (error) {
         if (ignore) {
           return;
         }
 
-        setWeatherRecords(baseWeatherRecords);
-        setDataSourceLabel("Local demo data");
-        setDataWarning(error instanceof Error ? error.message : "OpenET data could not be loaded.");
-        debugDataSource("openet", "request failed; using local demo data", {
+        setEtRecords(buildDemoEtRecords());
+        setDataSourceLabel("Demo data");
+        setDataWarning(null);
+        debugDataSource("openet", isOpenEtAvailabilityError(error) ? "request skipped; date range unavailable" : "request failed; no local demo data used", {
           fieldId: field.id,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -177,32 +126,31 @@ export function Dashboard({ field }: DashboardProps) {
     return () => {
       ignore = true;
     };
-  }, [baseWeatherRecords, field.cropId, field.id, field.lat, field.lon]);
+  }, [dateRange.endDate, dateRange.startDate, field.cropId, field.id, field.lat, field.lon]);
 
-  const snapshot = useMemo(() => buildAnalyticsSnapshot(field, crop, weatherRecords, mockAppliedWaterMm), [crop, field, weatherRecords]);
+  const snapshot = useMemo(() => buildAnalyticsSnapshot(field, crop, weatherRecords, []), [crop, field, weatherRecords]);
   const latest = snapshot.records.at(-1);
+  const cumulativeActualEtMm = etRecords.reduce((total, record) => total + (record.etActualMm ?? 0), 0);
+  const cumulativeReferenceEtMm = etRecords.reduce((total, record) => total + (record.etoMm ?? record.etReferenceMm ?? 0), 0);
   const chartData = useMemo(() => {
-    let cumulativeEto = 0;
-    let cumulativeEtc = 0;
-    let cumulativeHistorical = 0;
+    let cumulativeActual = 0;
+    let cumulativeReference = 0;
 
-    return snapshot.records.map((record, index) => {
-      const eto = weatherRecords[index].etoMm;
-      const historical = weatherRecords[index].etoMm * 0.9;
+    return etRecords.map((record) => {
+      const actual = record.etActualMm ?? 0;
+      const reference = record.etoMm ?? record.etReferenceMm ?? 0;
 
-      cumulativeEto += eto;
-      cumulativeEtc += record.etcMm;
-      cumulativeHistorical += historical;
+      cumulativeActual += actual;
+      cumulativeReference += reference;
 
       return {
         date: formatDateLabel(record.date),
         fullDate: record.date,
-        eto: Number(((etChartMode === "daily" ? eto : cumulativeEto) / 25.4).toFixed(2)),
-        etc: Number(((etChartMode === "daily" ? record.etcMm : cumulativeEtc) / 25.4).toFixed(2)),
-        historical: Number(((etChartMode === "daily" ? historical : cumulativeHistorical) / 25.4).toFixed(2)),
+        actual: Number(((etChartMode === "daily" ? actual : cumulativeActual) / 25.4).toFixed(2)),
+        reference: Number(((etChartMode === "daily" ? reference : cumulativeReference) / 25.4).toFixed(2)),
       };
     });
-  }, [etChartMode, snapshot.records, weatherRecords]);
+  }, [etChartMode, etRecords]);
   const labelStep = Math.max(1, Math.ceil(chartData.length / 6));
   const chartTicks = chartData.filter((_, index) => index % labelStep === 0 || index === chartData.length - 1).map((point) => point.date);
   const chartLabel = etChartMode === "daily" ? "Daily ET (in/day)" : "Cumulative ET (in)";
@@ -217,11 +165,13 @@ export function Dashboard({ field }: DashboardProps) {
         <div>
           <div className="heading-row">
             <h1>Real-Time Insights</h1>
-            <span className="season-badge">Active Season</span>
+            <span className="season-badge">
+              {formatDateLabel(dateRange.startDate)} - {formatDateLabel(dateRange.endDate)}
+            </span>
             <span className="data-source-badge">{dataSourceLabel}</span>
           </div>
           <p>
-            {field.name} - Block A-12 - {field.cropLabel}
+            {field.name} - {field.cropLabel}
           </p>
           {dataWarning ? <p className="data-warning">{dataWarning}</p> : null}
         </div>
@@ -240,25 +190,25 @@ export function Dashboard({ field }: DashboardProps) {
       <section className="metrics-grid">
         <MetricCard
           label="ET Accumulation"
-          value={inches(snapshot.cumulativeEtcMm)}
-          detail={`${inches(snapshot.cumulativeEtcMm - snapshot.cumulativeEtoMm)} vs reference ETo`}
-          badge={openEtApi.enabled && !dataWarning ? "OpenET Data" : "Demo Data"}
+          value={etRecords.length ? inches(cumulativeActualEtMm || cumulativeReferenceEtMm) : "Pending"}
+          detail={etRecords.length ? `${inches(cumulativeReferenceEtMm)} reference ETo` : "Configure OpenET for live ET"}
+          badge={etRecords.length ? "OpenET Data" : "No Live Data"}
           icon={Droplets}
         />
         <MetricCard
           label="Cumulative GDD"
-          value={Math.round(snapshot.currentGdd).toLocaleString()}
-          detail={`${snapshot.currentStage.label}${snapshot.nextStage ? ` - next: ${snapshot.nextStage.label}` : ""}`}
-          badge={`Kc ${snapshot.currentKc.toFixed(2)}`}
+          value={weatherRecords.length ? Math.round(snapshot.currentGdd).toLocaleString() : "Pending"}
+          detail={weatherRecords.length ? `${snapshot.currentStage.label}${snapshot.nextStage ? ` - next: ${snapshot.nextStage.label}` : ""}` : "Live weather provider needed"}
+          badge={weatherRecords.length ? `Kc ${snapshot.currentKc.toFixed(2)}` : "Weather WIP"}
           icon={ThermometerSun}
           tone="success"
         />
         {snapshot.chillRequirement ? (
           <MetricCard
             label="Chill Portions"
-            value={`${snapshot.chillPortions ?? 0}`}
-            detail={`${chillPercent}% of ${snapshot.chillRequirement} portion requirement`}
-            badge={`${crop.label} Specific`}
+            value={weatherRecords.length ? `${snapshot.chillPortions ?? 0}` : "Pending"}
+            detail={weatherRecords.length ? `${chillPercent}% of ${snapshot.chillRequirement} portion requirement` : "Hourly live weather provider needed"}
+            badge={weatherRecords.length ? `${crop.label} Specific` : "Weather WIP"}
             icon={Snowflake}
             tone="success"
           />
@@ -267,9 +217,9 @@ export function Dashboard({ field }: DashboardProps) {
         )}
         <MetricCard
           label="Hydrological Stress"
-          value={snapshot.stressLevel.toUpperCase()}
-          detail={`VPD: ${snapshot.vpdKpa ?? "n/a"} kPa - ${snapshot.stressLevel === "low" ? "normal range" : "watch crop demand"}`}
-          badge="Climate API"
+          value={weatherRecords.length ? snapshot.stressLevel.toUpperCase() : "Pending"}
+          detail={weatherRecords.length ? `VPD: ${snapshot.vpdKpa ?? "n/a"} kPa - ${snapshot.stressLevel === "low" ? "normal range" : "watch crop demand"}` : "Live humidity/dewpoint provider needed"}
+          badge="Weather WIP"
           icon={AlertTriangle}
           tone={snapshot.stressLevel === "low" ? "success" : "warning"}
         />
@@ -279,8 +229,8 @@ export function Dashboard({ field }: DashboardProps) {
         <section className="panel chart-panel">
           <div className="panel-title-row">
             <div>
-              <h2>ET Forecast & Historical Comparison</h2>
-              <p>Crop ET, reference ETo, and historical range from stable API feeds</p>
+              <h2>ET Activity</h2>
+              <p>Past 30 days of actual ET and reference ETo from live OpenET records</p>
             </div>
             <div className="segmented">
               <button className={etChartMode === "daily" ? "selected" : ""} type="button" onClick={() => setEtChartMode("daily")}>
@@ -306,19 +256,17 @@ export function Dashboard({ field }: DashboardProps) {
                 />
                 <YAxis tickLine={false} axisLine={false} width={58} tickMargin={8} tick={{ fontSize: 12 }} label={{ value: chartLabel, angle: -90, position: "insideLeft", offset: -4 }} />
                 <Tooltip
-                  formatter={(value, name) => [`${Number(value).toFixed(2)} in`, name === "etc" ? "ETc" : name === "eto" ? "Reference ETo" : "Historical range"]}
+                  formatter={(value, name) => [`${Number(value).toFixed(2)} in`, name === "actual" ? "Actual ET" : "Reference ETo"]}
                   labelFormatter={(label) => chartData.find((point) => point.date === label)?.fullDate ?? label}
                 />
-                <Area type="monotone" dataKey="historical" stroke="none" fill="#e7e6e1" />
-                <Line type="monotone" dataKey="etc" stroke="#061827" strokeWidth={3} dot={false} />
-                <Line type="monotone" dataKey="eto" stroke="#934936" strokeWidth={3} dot={false} />
+                <Line type="monotone" dataKey="actual" stroke="#061827" strokeWidth={3} dot={false} />
+                <Line type="monotone" dataKey="reference" stroke="#934936" strokeWidth={3} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
           <div className="legend">
-            <span className="legend-etc">ETc</span>
+            <span className="legend-etc">Actual ET</span>
             <span className="legend-eto">Reference ETo</span>
-            <span className="legend-range">Historical Range</span>
           </div>
         </section>
 
@@ -372,4 +320,15 @@ export function Dashboard({ field }: DashboardProps) {
       </section>
     </main>
   );
+}
+
+function buildDemoEtRecords(): EtRecord[] {
+  return mockWeatherRecords.map((record) => ({
+    date: record.date,
+    etoMm: record.etoMm,
+    etActualMm: Number((record.etoMm * 0.92).toFixed(1)),
+    etReferenceMm: record.etoMm,
+    precipMm: record.precipMm,
+    source: record.source,
+  }));
 }

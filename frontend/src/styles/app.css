@@ -98,21 +98,120 @@ button {
   color: #43474c;
 }
 
-.auth-status {
-  height: 32px;
+.account-control {
+  position: relative;
+}
+
+.account-button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #43474c;
+  cursor: pointer;
+}
+
+.account-button:hover,
+.account-button-active {
+  border-color: #c4c6cc;
+  background: #f5f3ef;
+  color: #061827;
+}
+
+.account-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 20;
+  width: 280px;
+  display: grid;
+  border: 1px solid #c4c6cc;
+  background: #ffffff;
+  box-shadow: 0 18px 40px rgba(6, 24, 39, 0.16);
+}
+
+.account-menu-status {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #c4c6cc;
+}
+
+.account-menu-status strong {
+  color: #061827;
+  font-size: 14px;
+}
+
+.account-menu-status span,
+.account-menu-note {
+  color: #43474c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.account-menu-note {
+  padding: 14px 16px;
+}
+
+.account-menu-action {
+  height: 42px;
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
+  padding: 0 16px;
+  border: 0;
+  background: #ffffff;
+  color: #061827;
+  font-weight: 800;
+}
+
+.account-menu-action:hover {
+  background: #f5f3ef;
+}
+
+.auth-popover {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.auth-popover label {
+  display: grid;
+  gap: 6px;
+  color: #43474c;
+  font-family: Geist, ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.auth-popover input {
+  height: 38px;
   padding: 0 10px;
   border: 1px solid #c4c6cc;
   background: #f5f3ef;
-  color: #43474c;
-  border-radius: 3px;
-  font-family: Geist, ui-monospace, monospace;
+  color: #061827;
+}
+
+.auth-popover p {
+  color: #934936;
   font-size: 12px;
+  font-weight: 700;
+}
+
+.auth-popover button {
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #061827;
+  background: #061827;
+  color: #ffffff;
   font-weight: 800;
-  text-transform: uppercase;
-  white-space: nowrap;
 }
 
 .body-shell {

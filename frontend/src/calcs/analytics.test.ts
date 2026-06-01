@@ -8,7 +8,7 @@ import { defaultFields } from "../data/fields";
 import type { WeatherRecord } from "../types/domain";
 
 const record: WeatherRecord = {
-  date: "2026-03-01",
+  date: "2024-03-01",
   tminC: 10,
   tmaxC: 25,
   precipMm: 0,
