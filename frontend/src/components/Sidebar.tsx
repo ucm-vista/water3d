@@ -1,4 +1,4 @@
-import { BarChart3, MapPinned, Settings } from "lucide-react";
+import { BarChart3, Settings } from "lucide-react";
 
 interface SidebarProps {
   activeView: string;
@@ -7,7 +7,6 @@ interface SidebarProps {
 
 const items = [
   { label: "Analytics", icon: BarChart3 },
-  { label: "Setup", icon: MapPinned },
 ];
 
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {

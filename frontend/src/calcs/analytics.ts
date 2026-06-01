@@ -17,7 +17,7 @@ export function buildAnalyticsSnapshot(
     const gdd = dailyGdd(record, crop);
     cumulativeGddValue += gdd;
     const kc = interpolateKc(crop, seasonProgressFromGdd(crop, cumulativeGddValue));
-    const etcMm = Number((record.etoMm * kc).toFixed(1));
+    const etcMm = Number((record.etActualMm ?? record.etoMm * kc).toFixed(1));
     cumulativeEtcMm += etcMm;
 
     return {

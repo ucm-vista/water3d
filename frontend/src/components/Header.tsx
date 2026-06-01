@@ -1,4 +1,4 @@
-import { Bell, Plus, UserCircle } from "lucide-react";
+import { Bell, Rows3, UserCircle } from "lucide-react";
 import type { FieldConfig } from "../types/domain";
 import { AuthStatus } from "./AuthStatus";
 
@@ -21,16 +21,12 @@ export function Header({ fields, selectedFieldId, activeView, onFieldChange, onV
           </option>
         ))}
       </select>
-      <nav className="main-nav" aria-label="Primary">
-        <button className={activeView === "Analytics" ? "nav-active" : ""} onClick={() => onViewChange("Analytics")}>
-          Analytics
-        </button>
-        <button className="add-field-link" onClick={() => onViewChange("Setup")}>
-          <Plus size={18} />
-          Add Field
-        </button>
-      </nav>
+      <div />
       <div className="header-actions">
+        <button className="manage-fields-button" onClick={() => onViewChange("Fields")}>
+          <Rows3 size={16} />
+          Manage Fields
+        </button>
         <AuthStatus />
         <Bell size={22} />
         <UserCircle size={24} />

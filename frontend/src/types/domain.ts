@@ -42,6 +42,12 @@ export interface FieldConfig {
   lon: number;
   soilTexture: string;
   awhcMmPerM: number;
+  soilMapUnitKey?: string;
+  soilMapUnitName?: string;
+  soilComponentName?: string;
+  soilComponentPercent?: number;
+  hydrologicGroup?: string;
+  drainageClass?: string;
   rootDepthM: number;
   madFraction: number;
   stageStartDate: string;
@@ -56,6 +62,9 @@ export interface WeatherRecord {
   tmaxC: number;
   precipMm: number;
   etoMm: number;
+  etActualMm?: number;
+  ndvi?: number;
+  modelCount?: number;
   source: WeatherSource;
   rhMin?: number;
   rhMax?: number;
