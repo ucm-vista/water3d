@@ -5,11 +5,16 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { soilDataAccessApi, soilDataAccessProvider } from "../api";
 import { cropOptions } from "../data/crops";
 import { mapboxConfig } from "../config/mapbox";
-import type { CropId, FieldConfig } from "../types/domain";
+import type { CropId, FieldConfig, StageThreshold } from "../types/domain";
 import { debugDataSource } from "../utils/debug";
 import { toIsoDate } from "../utils/dateRange";
 
 const FieldSetupMap = lazy(() => import("./FieldSetupMap"));
+
+function currentYearStartDate(): string {
+  const now = new Date();
+  return toIsoDate(new Date(Date.UTC(now.getFullYear(), 0, 1)));
+}
 
 type SearchRetrieveResult = {
   features: Array<{
@@ -29,6 +34,7 @@ interface SetupPanelProps {
 export function SetupPanel({ onCreateField, onUpdateField, onCancel, field }: SetupPanelProps) {
   const [location, setLocation] = useState(field ? { lat: field.lat, lon: field.lon } : mapboxConfig.defaultCenter);
   const [searchValue, setSearchValue] = useState("");
+  const [selectedCropId, setSelectedCropId] = useState<CropId>(field?.cropId ?? cropOptions[0].id);
   const [detectedProperties, setDetectedProperties] = useState({
     soilTexture: field?.soilTexture ?? "Sandy Loam (SSURGO)",
     awhcMmPerM: field?.awhcMmPerM,
@@ -43,6 +49,7 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, field }: Se
   });
   const [soilStatus, setSoilStatus] = useState(soilDataAccessApi.enabled ? "Detecting soil..." : "Using local defaults");
   const isEditing = Boolean(field);
+  const selectedCrop = cropOptions.find((option) => option.id === selectedCropId) ?? cropOptions[0];
 
   useEffect(() => {
     let ignore = false;
@@ -133,9 +140,17 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, field }: Se
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const cropId = String(form.get("cropId")) as CropId;
+    const cropId = selectedCropId;
     const crop = cropOptions.find((option) => option.id === cropId) ?? cropOptions[0];
     const fieldName = String(form.get("fieldName") || "New Field");
+    const plantingDate = String(form.get("plantingDate") || field?.stageStartDate || currentYearStartDate());
+    const stageThresholds = crop.stages.map((stage, index): StageThreshold => {
+      const gdd = Number(form.get(`stageGdd-${index}`));
+      return {
+        label: stage.label,
+        gdd: Number.isFinite(gdd) ? gdd : stage.gdd,
+      };
+    });
 
     const nextField: FieldConfig = {
       id: field?.id ?? `${fieldName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`,
@@ -154,7 +169,8 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, field }: Se
       drainageClass: detectedProperties.drainageClass,
       rootDepthM: crop.rootDepthM,
       madFraction: crop.madFraction,
-      stageStartDate: field?.stageStartDate ?? toIsoDate(new Date()),
+      stageStartDate: plantingDate,
+      stageThresholds,
       irrigationEfficiency: field?.irrigationEfficiency ?? 0.85,
       weatherCell: detectedProperties.weatherCell,
       elevationFt: detectedProperties.elevationFt,
@@ -267,19 +283,44 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, field }: Se
 
           <section className="panel crop-card">
             <h2>2. Select Crop</h2>
-            {cropOptions.map((crop, index) => (
+            {cropOptions.map((crop) => (
               <label key={crop.id} className="crop-option">
-                <input type="radio" name="cropId" value={crop.id} defaultChecked={field ? field.cropId === crop.id : index === 0} />
+                <input
+                  type="radio"
+                  name="cropId"
+                  value={crop.id}
+                  checked={selectedCropId === crop.id}
+                  onChange={() => setSelectedCropId(crop.id)}
+                />
                 <span>{crop.varietyHint ? `${crop.label} (${crop.varietyHint})` : crop.label}</span>
               </label>
             ))}
+          </section>
+
+          <section className="panel stage-threshold-card">
+            <h2>3. Stage Thresholds</h2>
+            <div className="stage-threshold-list">
+              {selectedCrop.stages.map((stage, index) => {
+                const override = field?.cropId === selectedCrop.id ? field.stageThresholds?.[index] : undefined;
+                return (
+                  <label key={`${selectedCrop.id}-${stage.label}`} className="stage-threshold-row">
+                    <span>{stage.label}</span>
+                    <input name={`stageGdd-${index}`} type="number" min="0" step="1" defaultValue={override?.gdd ?? stage.gdd} />
+                  </label>
+                );
+              })}
+            </div>
           </section>
         </aside>
 
         <section className="activate-card">
           <div>
-            <h2>3. Name Your Field</h2>
+            <h2>4. Name Your Field</h2>
             <input name="fieldName" placeholder="e.g. West Orchard Sector 4" defaultValue={field?.name ?? ""} required />
+          </div>
+          <div>
+            <h2>5. Planting / Stage Start</h2>
+            <input name="plantingDate" type="date" defaultValue={field?.stageStartDate ?? ""} />
           </div>
           <button type="submit">{isEditing ? "Save Field Changes" : "Activate Field Monitoring"}</button>
         </section>

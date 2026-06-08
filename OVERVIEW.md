@@ -1,208 +1,146 @@
-# Water 3D API Contracts
+# Water 3D Data Status
 
-## Current Frontend Data Audit
-The frontend now calls Mapbox Search, Mapbox maps/static thumbnails, OpenET through a Vite dev proxy, and NRCS Soil Data Access through a Vite dev proxy. The dashboard still depends on several mock or local values because those provider contracts are not implemented yet.
+This document tracks which data paths are live, which are mocked or fallback-only, and what still needs to be added before the dashboard should be treated as production decision support.
 
-### Live Or Partially Live
-- Mapbox Search: used in field setup for address/place/lat-lon search.
-- Mapbox GL: used in field setup map.
-- Mapbox Static Images: used in Manage Fields thumbnails.
-- NRCS Soil Data Access: used in field setup to detect map unit, dominant component, surface texture, hydrologic group, drainage class, and AWHC.
-- OpenET raster point time series: configured and called for `ET`, `ETo`, and `PR`; values are merged by date when returned.
+## Working Now
 
-### Still Mocked Or Static
-- Daily weather is mocked in `frontend/src/data/weather.ts`.
-- Forecast weather is mocked in `frontend/src/data/weather.ts`.
-- Applied water is mocked as `mockAppliedWaterMm`.
-- Historical ET comparison is calculated as a local `ETo * 0.9` placeholder.
-- Field storage is localStorage; PocketBase repository is scaffolded but not active.
-- Default field comes from `frontend/src/data/fields.ts`.
-- Weather grid/cell is placeholder text such as `Grid ID #4829` or `Pending weather grid lookup`.
-- Elevation is static/defaulted; NRCS soil lookup currently returns `0 ft` because elevation is not a soil property.
-- Dashboard subtitle still includes a static `Block A-12`.
-- VPD/stress uses local humidity mock values; there is no live humidity/dewpoint provider.
-- Chill and frost/heat signals use daily interpolated/mock weather; no hourly temperature provider exists.
-
-### WIP Data Source Review
-Treat any UI display backed by mock, fallback, static, or locally transformed data as WIP, even when the surrounding panel is visible in the app.
-
-| Data source or display | Current state | WIP reason |
+| Area | Status | Notes |
 | --- | --- | --- |
-| OpenET ET/ETo/precip | Partially live when `VITE_OPENET_API_KEY` is configured; otherwise local demo data. | OpenET is merged into mock weather dates, requests are capped by availability, and the display is point-based rather than field-boundary averaged. |
-| Daily historical weather | Mock data from `frontend/src/data/weather.ts`. | No live weather/climate provider owns canonical dates, min/max temperature, precipitation, ETo, humidity, quality flags, or station/grid metadata. |
-| Forecast weather | Mock data from `frontend/src/data/weather.ts`. | No forecast provider or forecast horizon contract is implemented. |
-| ET forecast chart | Mixed/derived data in `Dashboard.tsx`. | Chart title implies stable feeds, but ETc is calculated from local crop coefficients, weather is mock-backed, and historical range is a placeholder transform. |
-| Historical ET comparison | Local `ETo * 0.9` transform in `Dashboard.tsx` and mock provider output. | No historical baseline provider, climatology, prior-year comparison, or provider metadata exists. |
-| Applied water / irrigation depletion inputs | `mockAppliedWaterMm` from `frontend/src/data/weather.ts`. | No user entry, controller API, meter telemetry, or pump telemetry source exists; outputs using applied water are demo-only. |
-| GDD accumulation | Calculated from mock/interpolated daily temperatures. | Calculation logic exists, but the source temperatures are not live or provider-qualified. |
-| Chill portions | Calculated from mock/interpolated daily temperatures. | No hourly temperature provider exists, so chill, frost, and heat signals are not production-grade. |
-| Hydrological stress / VPD | Calculated from mock humidity values and labeled `Climate API` in the UI. | No live humidity/dewpoint provider exists; the metric card display should be treated as WIP despite the API label. |
-| Soil properties | Live through NRCS SDA when enabled, with local defaults as fallback. | Soil texture/AWHC/map-unit fields are partially live, but fallback displays remain demo/default values when the lookup is unavailable. |
-| Weather cell | Static placeholder such as `Grid ID #4829`. | No weather grid/station/cell lookup provider is implemented. |
-| Elevation | Static/defaulted, currently `0 ft` from NRCS lookup or `342 ft` local default. | Elevation is not returned by soil lookup; a terrain/elevation provider is still needed. |
-| Field records | localStorage/default field data. | PocketBase auth/storage is scaffolded but disabled; default field and persisted fields remain local. |
-| Dashboard subtitle and controls | Static labels such as `Block A-12`, `Active Season`, `Last 30 Days`, and `Export Data`. | These displays are not bound to real block metadata, date-range selection, season state, or export implementation. |
+| Field search and setup map | Live | Mapbox Search and Mapbox GL are used during field setup. |
+| Field thumbnails | Live | Mapbox Static Images render saved field thumbnails. |
+| Soil lookup | Live with fallback | NRCS Soil Data Access detects map unit, component, texture, hydrologic group, drainage class, and AWHC when enabled. Local defaults remain as fallback. |
+| OpenET historical ET/ETo | Live with fallback | OpenET raster point time series is requested for saved field coordinates. Responses are cached in PocketBase `openet_cache` when PocketBase is enabled. |
+| OpenET response storage | Live | `openet_cache` stores request payload, raw response, field coordinate, variable, date range, and fetched timestamp. |
+| Climate Toolbox forecast PET | Live, not cached | 28-day CFS PET forecast is fetched through `/api/climate-toolbox`, parsed from cumulative ensemble/median response tables, and displayed as forecast bars. |
+| Climate Toolbox forecast weather | Live, not cached | 28-day CFS `tmmx`, `tmmn`, `pr`, and `sph` are fetched through `/api/climate-toolbox`. Temperature is converted from K to C, precipitation is converted from cumulative to daily increments, specific humidity is converted to approximate RH/dewpoint, and hourly temperatures are interpolated from daily Tmin/Tmax. |
+| Forecast PET percentiles | Working | The chart now carries Climate Toolbox forecast PET p10/p90 bounds when the response includes `pet_10p(mm)` and `pet_90p(mm)`. These are forecast uncertainty bounds, not historical climatology bands. |
+| ET graph | Working | Bar chart shows historical Actual ET, historical Reference ETo, forecast PET, and forecast PET p10/p90 bound lines. If live historical ET is unavailable, mock past-30-day ET is displayed with a clear warning. No mock forecast is generated. |
+| Crop selection | Working | Field setup supports crop selection and saves it with the field. |
+| Planting / stage start date | Working | Field setup accepts a date. Live historical ET requests and GDD calculations start from that date; if no date is supplied, Jan 1 of the current year is used. |
+| User-adjustable crop stage thresholds | Working | Field setup exposes editable GDD thresholds for the selected crop. The values are stored with the field locally and in PocketBase field `metadata.stageThresholds`, then used by analytics. |
+| Irrigation depletion / days-until-irrigation | Forecast estimate | Dashboard estimates days until management allowed depletion is reached using forecast ETc and precipitation with no irrigation applied. Applied-water input is still required before this becomes an irrigation recommendation. |
+| Field persistence | Working with conditions | Fields persist to localStorage always. PocketBase field storage works when PocketBase is enabled and the user is authenticated. |
 
-## Active v1 Data Needs
-The current product direction is setup plus analytics. APIs should support dropping a field pin, selecting a crop, switching fields, detecting soil, and generating ET/GDD/chill/stress analytics. Scheduler, budgeting, scouting, groundwater, and station-management data remain deferred.
+## Mocked Or Fallback Data
 
-## Setup APIs
-### Location Search
-Provider: Mapbox Search.
+| Area | Current behavior | Needed replacement |
+| --- | --- | --- |
+| Historical ET fallback | Uses `frontend/src/data/weather.ts` to create past-30-day mock ET only when live historical ET is unavailable. | Keep as demo fallback; do not use for advisory decisions. |
+| Historical GDD, chill, VPD, heat/frost stress | Historical weather is not wired. Forecast weather records can now drive projected GDD/VPD and approximate dewpoint/hourly temperatures, but current-season historical weather is still absent. | Historical daily Tmin/Tmax, precipitation, humidity/dewpoint, and ideally provider-supplied hourly temperatures from Climate Toolbox/gridMET/CIMIS or another provider. |
+| Applied water | No live applied-water source. | User entry, irrigation controller export/API, meter telemetry, or pump telemetry. |
+| Weather cell / station id | Placeholder field value. | Provider-specific grid/station lookup. |
+| Elevation | Static/defaulted. | Elevation/terrain provider if elevation is needed in calculations. |
+| Export data button | UI only. | CSV/JSON export implementation. |
 
-Required response fields:
-- `id`
-- `label`
-- `placeName`
-- `lat`, `lon`
-- optional `county`, `region`, `timezone`
-- provider metadata
+## Not Yet Added
 
-### Field Context
-This is a composed setup response built from multiple providers.
+| Feature | Status |
+| --- | --- |
+| Historical Climate Toolbox/gridMET weather | Blocked by provider configuration. The documented `get-netcdf-data` examples use placeholder data paths; direct gridMET aggregate paths currently return the service error that paths must be whitelisted. |
+| Provider-supplied hourly weather or dewpoint | Partially implemented. Daily forecast specific humidity is converted to approximate dewpoint and hourly temperatures are interpolated from daily Tmin/Tmax. Exact chill/frost/heat workflows still need real hourly temperatures or observed dewpoint. |
+| Historical percentile bands | Not implemented. Forecast PET p10/p90 bounds are shown, but historical p10/p30/p50/p70/p90 climatology paths still need whitelisted Climate Toolbox dataset keys. |
+| Historical ET climatology / baseline | Not implemented. No prior-year or normal-year baseline provider exists yet because the historical percentile/climatology data paths are not configured. |
+| Irrigation recommendations with applied water | Partially implemented. A no-irrigation forecast depletion estimate is visible; applied-water records are still required before recommending irrigation timing. |
+| Repository access for Emery | External process, not code. |
+| Periodic screenshots to Emery | External process unless a reporting workflow is defined. |
 
-Required response fields:
-- `lat`, `lon`
-- `label`
-- `county`, `region`, `timezone` when available
-- `soilTexture`
-- `awhcMmPerM`
-- `soilMapUnitKey`
-- `soilMapUnitName`
-- `soilComponentName`
-- `soilComponentPercent`
-- `hydrologicGroup`
-- `drainageClass`
-- `weatherCellId`
-- `weatherProvider`
-- `elevationFt`
+## Crop Profiles
 
-Current status:
-- Soil fields are live through NRCS SDA.
-- Weather cell/provider is missing.
-- Elevation is missing.
-- County/timezone are not persisted yet.
+Local crop profiles currently exist for:
 
-## Weather APIs
-The calculation core needs daily records for the selected field/date range. OpenET does not provide the full weather contract, so this requires a separate climate/weather API.
+- Almond
+- Processing tomato
+- Wine grape
+- Pistachio
+- Cotton
+- Alfalfa
 
-Required daily fields:
-- `date` as ISO date
-- `tminC`
-- `tmaxC`
-- `precipMm`
-- `etoMm`
-- `source`: `historical` or `forecast`
+The profiles include base/upper temperatures, Kc curve, GDD stage thresholds, MAD, root depth, TAW, chill requirement where relevant, and stress thresholds. These are v1 defaults and should be reviewed before advisory use.
 
-Required forecast fields:
-- same shape as daily weather records
-- forecast horizon should cover at least 7 days for near-term irrigation/stress projections
+Reference notes used while filling gaps:
 
-Optional but important:
-- `rhMin`, `rhMax` or `tdewC` for VPD
-- `hourlyTempsC[24]` for chill, frost, and heat stress accuracy
-- weather grid/station/cell id
-- provider metadata and quality flags
+- UC IPM cotton planting guidance says cotton seed requires about 50 degree-days for emergence under good planting-depth conditions.
+- UC IPM pistachio shell-hardening model lists shell hardening at 665 C degree-days from 75% bloom.
+- UC ANR almond hull-split material documents GDD-based hull-split prediction from bloom.
+- Existing tomato, grape, almond, and alfalfa values remain local Water 3D v1 defaults pending agronomic review.
 
-Current frontend gap:
-- GDD, VPD, chill, and stress are still driven by mock/interpolated weather.
+## Current Dashboard Data Rules
 
-## OpenET APIs
-OpenET should provide observed ET inputs and optional vegetation/quality signals.
+- Historical ET comes from OpenET when available.
+- OpenET responses are cached in PocketBase.
+- Forecast PET, Tmin, Tmax, precipitation, and specific humidity come from Climate Toolbox and are not cached.
+- Forecast PET p10/p90 are shown when the Climate Toolbox response includes percentile columns.
+- Forecast daily specific humidity is converted to approximate RH/dewpoint; hourly temperatures are interpolated from daily Tmin/Tmax.
+- If OpenET historical ET is unavailable, mock past-30-day ET is displayed and labeled as mock.
+- If Climate Toolbox forecast weather is unavailable, no forecast PET/weather is displayed.
+- GDD/VPD can now use forecast weather records. Historical GDD/VPD remain blocked until historical weather is wired.
+- Stage thresholds are editable per field and override crop profile defaults for analytics.
+- Irrigation depletion assumes no applied water until applied-water records are integrated.
+- The `Precision Insights` panel has been removed from the dashboard.
 
-Current configured variables:
-- `ET`: actual ET, mapped to `etActualMm`
-- `ETo`: reference ET, mapped to `etoMm` and `etReferenceMm`
-- `PR`: precipitation, mapped to `precipMm`
-- optional `ETof`: ET fraction
-- optional `NDVI`: vegetation index
-- optional `MODEL_COUNT`: ensemble quality context
+## Next Implementation Targets
 
-Preferred request mode:
-- raster point time series using the saved field latitude/longitude
+1. Get whitelisted Climate Toolbox `get-netcdf-data` keys/data paths for historical gridMET weather, historical percentiles, and climatology baselines.
+2. Add applied-water input or telemetry so depletion can include irrigation and become actionable.
+3. Replace interpolated hourly temperatures with provider-supplied hourly data or a confirmed dewpoint endpoint.
+4. Add CSV/JSON export for the ET/weather/irrigation data now visible in the dashboard.
 
-Current frontend gap:
-- OpenET data is merged into mock weather dates. A real weather provider should own the canonical date range.
-- OpenET requests are capped by `VITE_OPENET_MAX_AVAILABLE_DATE` because the API availability window can lag the app's current/demo season.
-- Historical baseline is still a placeholder.
-- ET represents the saved field point, not a full field boundary average.
 
-## Applied Water APIs
-The dashboard currently uses `mockAppliedWaterMm`; this should be replaced before irrigation/depletion outputs are trusted.
+# Water 3D Architecture Plan
 
-Required fields:
-- `fieldId`
-- `date`
-- `appliedMm`
-- `source`: `user`, `meter`, `irrigation-system`, or `local`
+## Summary
+Water 3D is an analytics-first decision support app for Central Valley growers and irrigation managers. The map is used during setup to locate a field, then the core product becomes a crop-aware analytics dashboard driven by ET, GDD, chill, historical comparisons, and stress signals.
 
-Possible sources:
-- manual user input
-- irrigation controller export/API
-- flow meter or pump telemetry
-- local placeholder only for demo
+The current implementation should start as a self-contained frontend with mock weather/OpenET data and a framework-agnostic TypeScript calculation core. PocketBase remains available for future persistence, but v1 stores field configuration locally and avoids backend coupling until API contracts are finalized.
 
-Current frontend gap:
-- No user input or provider exists for applied water.
+## Key Implementation Choices
+- Build a `frontend/` React + Vite + TypeScript app.
+- Keep agronomic math in pure TypeScript modules under `src/calcs`.
+- Keep API/provider contracts in `src/api` so live OpenET, Catherine/Climate, Mapbox, and later PocketBase implementations can replace mocks without changing UI calculations.
+- Use static crop profiles and deterministic mock weather records for v1.
+- Persist selected/configured fields in localStorage.
+- Scaffold PocketBase behind `VITE_POCKETBASE_ENABLED=false`; do not make auth or storage calls until explicitly enabled.
+- Keep the map out of the primary workflow after setup.
+- Remove v1 irrigation scheduling, budgeting, profitability, scouting, groundwater, and station-management surfaces.
+- Prioritize the “new direction” Stitch samples:
+  - `field_setup_analytics_configuration`
+  - `field_analytics_dashboard_new_direction`
 
-## Historical Baseline APIs
-The ET chart displays a historical comparison band/line, but it is currently a simple local transform.
+## Product Surface
+- Field setup:
+  - search/drop-pin style location panel
+  - detected soil/weather properties
+  - crop selection
+  - field name entry
+  - activation into local field list
+- Analytics dashboard:
+  - field selector
+  - ET accumulation
+  - cumulative GDD
+  - crop-aware chill card
+  - VPD/weather stress status
+  - ET forecast and historical comparison chart
+  - precision insights generated from calculated state
+- No separate map, scheduler, budget, reports, scouting, or groundwater screens in v1.
 
-Required fields:
-- `date`
-- optional `etoMm`
-- optional `etcMm`
-- optional `gdd`
-- provider metadata
+## Interfaces
+- `FieldConfig`: field identity, crop, location, soil, stage dates, and optional irrigation settings.
+- `WeatherRecord`: daily weather/ET inputs, with optional RH/dewpoint/hourly temperatures.
+- `CropProfile`: crop defaults for GDD, Kc, MAD, root depth, chill, and stress thresholds.
+- `AnalyticsSnapshot`: computed dashboard state from field + weather + crop profile.
+- `DataProvider`: later boundary for live OpenET/weather providers.
+- `LocationProvider`, `WeatherProvider`, and `EtProvider`: active v1 API boundaries for setup and analytics.
+- `AuthRepository`: PocketBase login/session/logout boundary, disabled by default.
+- `FieldRepository`: future PocketBase field storage boundary; current app remains localStorage-backed.
 
-Useful baseline options:
-- same field/location, same calendar day over prior years
-- crop-specific normal for region/county
-- OpenET historical ET climatology
+## Test Plan
+- Unit-test GDD, ETc, VPD, chill gating, and analytics snapshot generation.
+- Verify crop-aware dashboard behavior, especially chill visibility.
+- Verify localStorage field setup/save/load behavior manually in the app.
+- Run TypeScript build before delivery.
 
-Current frontend gap:
-- No real historical baseline provider exists.
-
-## Field / Storage APIs
-Field data is stored locally now, later through PocketBase.
-
-Required field fields:
-- field id/name
-- crop id/label
-- lat/lon
-- soil texture
-- AWHC
-- soil map unit/component metadata
-- hydrologic group/drainage class
-- weather cell/provider
-- elevation
-- stage start date
-- root depth/MAD defaults copied from selected crop profile
-
-Current frontend gap:
-- localStorage only
-- PocketBase auth/storage is scaffolded but disabled
-- field storage remains point-based: no boundary capture is planned
-
-## Local Static Crop Data
-Crop profiles are local static data for v1:
-- GDD base/upper temperatures
-- Kc curve
-- stage thresholds
-- chill requirement where crop-dependent
-- stress thresholds
-- root depth, MAD, and TAW defaults
-
-Potential future backend need:
-- versioned crop profiles if agronomic coefficients need admin editing or regional variants.
-
-## Deferred Data
-Do not require these for the current UI:
-- water allocation
-- district pricing
-- profitability/accounting data
-- scouting or ground-truth observations
-- groundwater monitoring
-- manually managed station networks
-
-If added later, allocation/cost fields should be optional user inputs and panels should render only when values exist.
+## Assumptions
+- v1 does not include irrigation scheduling, budgeting, profitability, groundwater integrations, scouting, reports, or station management.
+- Live OpenET/Catherine API credentials are not available in the current workspace, so the app uses mock provider data behind replaceable interfaces.
+- PocketBase has no domain collections yet, so localStorage is the implementation default.
+- PocketBase auth/storage code is present only as a disabled adapter. No records should be created until backend schema and enablement are approved.

@@ -12,11 +12,14 @@ export function buildAnalyticsSnapshot(
 ): AnalyticsSnapshot {
   let cumulativeGddValue = 0;
   let cumulativeEtcMm = 0;
+  const startDate = field.stageStartDate;
+  const weatherWindow = startDate ? weather.filter((record) => record.date >= startDate) : weather;
+  const effectiveCrop = field.stageThresholds?.length ? { ...crop, stages: field.stageThresholds } : crop;
 
-  const records: DailyAnalytics[] = weather.map((record, index) => {
-    const gdd = dailyGdd(record, crop);
+  const records: DailyAnalytics[] = weatherWindow.map((record) => {
+    const gdd = dailyGdd(record, effectiveCrop);
     cumulativeGddValue += gdd;
-    const kc = interpolateKc(crop, seasonProgressFromGdd(crop, cumulativeGddValue));
+    const kc = interpolateKc(effectiveCrop, seasonProgressFromGdd(effectiveCrop, cumulativeGddValue));
     const etcMm = Number((record.etActualMm ?? record.etoMm * kc).toFixed(1));
     cumulativeEtcMm += etcMm;
 
@@ -32,13 +35,14 @@ export function buildAnalyticsSnapshot(
   });
 
   const currentGdd = records.at(-1)?.cumulativeGdd ?? 0;
-  const currentStage = crop.stages.reduce((active, stage) => (currentGdd >= stage.gdd ? stage : active), crop.stages[0]);
-  const nextStage = crop.stages.find((stage) => stage.gdd > currentGdd);
-  const currentKc = records.at(-1)?.kc ?? crop.kcCurve[0].kc;
+  const currentStage = effectiveCrop.stages.reduce((active, stage) => (currentGdd >= stage.gdd ? stage : active), effectiveCrop.stages[0]);
+  const nextStage = effectiveCrop.stages.find((stage) => stage.gdd > currentGdd);
+  const currentKc = records.at(-1)?.kc ?? effectiveCrop.kcCurve[0].kc;
   const cumulativeEtoMm = Number(weather.reduce((total, record) => total + record.etoMm, 0).toFixed(1));
   const latestVpd = [...records].reverse().find((record) => typeof record.vpdKpa === "number")?.vpdKpa;
-  const chillPortions = crop.chillRequirementPortions ? estimateChillPortions(weather) : undefined;
-  const stressLevel = latestVpd && latestVpd >= crop.stress.highVpdKpa + 0.5 ? "high" : latestVpd && latestVpd >= crop.stress.highVpdKpa ? "moderate" : "low";
+  const chillPortions = effectiveCrop.chillRequirementPortions ? estimateChillPortions(weather) : undefined;
+  const stressLevel =
+    latestVpd && latestVpd >= effectiveCrop.stress.highVpdKpa + 0.5 ? "high" : latestVpd && latestVpd >= effectiveCrop.stress.highVpdKpa ? "moderate" : "low";
 
   const insights = [
     nextStage
@@ -52,7 +56,7 @@ export function buildAnalyticsSnapshot(
 
   return {
     field,
-    crop,
+    crop: effectiveCrop,
     records,
     currentGdd,
     currentStage,
@@ -61,7 +65,7 @@ export function buildAnalyticsSnapshot(
     cumulativeEtcMm: Number(cumulativeEtcMm.toFixed(1)),
     cumulativeEtoMm,
     chillPortions,
-    chillRequirement: crop.chillRequirementPortions,
+    chillRequirement: effectiveCrop.chillRequirementPortions,
     stressLevel,
     vpdKpa: latestVpd,
     insights,

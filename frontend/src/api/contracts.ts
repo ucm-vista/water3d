@@ -79,6 +79,8 @@ export interface EtDataResponse {
     etoMm?: number;
     etActualMm?: number;
     etReferenceMm?: number;
+    forecastPetP10Mm?: number;
+    forecastPetP90Mm?: number;
     precipMm?: number;
     ndvi?: number;
     modelCount?: number;

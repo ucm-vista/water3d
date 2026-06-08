@@ -5,6 +5,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const openEtTarget = env.VITE_OPENET_BASE_URL || "https://openet-api.org";
   const soilTarget = env.VITE_SOIL_DATA_ACCESS_BASE_URL || "https://sdmdataaccess.nrcs.usda.gov";
+  const climateToolboxTarget = env.VITE_CLIMATE_TOOLBOX_CFS_BASE_URL || "https://climate-dev.nkn.uidaho.edu";
 
   return {
     plugins: [react()],
@@ -21,6 +22,12 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: true,
           rewrite: (path) => path.replace(/^\/api\/soil-data-access/, ""),
+        },
+        "/api/climate-toolbox": {
+          target: climateToolboxTarget,
+          changeOrigin: true,
+          secure: true,
+          rewrite: (path) => path.replace(/^\/api\/climate-toolbox/, ""),
         },
       },
     },

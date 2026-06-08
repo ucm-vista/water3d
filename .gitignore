@@ -9,6 +9,9 @@ dist/
 vite.config.js
 vite.config.d.ts
 
+# Local text notes
+*.txt
+
 # Local env files
 **/.env
 **/.env.local

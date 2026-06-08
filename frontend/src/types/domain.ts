@@ -1,4 +1,4 @@
-export type CropId = "almond" | "tomato" | "wineGrape" | "alfalfa";
+export type CropId = "almond" | "tomato" | "wineGrape" | "alfalfa" | "pistachio" | "cotton";
 
 export type WeatherSource = "historical" | "forecast";
 
@@ -51,6 +51,7 @@ export interface FieldConfig {
   rootDepthM: number;
   madFraction: number;
   stageStartDate: string;
+  stageThresholds?: StageThreshold[];
   irrigationEfficiency: number;
   weatherCell: string;
   elevationFt: number;
@@ -62,6 +63,8 @@ export interface WeatherRecord {
   tmaxC: number;
   precipMm: number;
   etoMm: number;
+  forecastPetP10Mm?: number;
+  forecastPetP90Mm?: number;
   etActualMm?: number;
   ndvi?: number;
   modelCount?: number;

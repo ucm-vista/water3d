@@ -70,7 +70,7 @@ export const openEtConfig = {
   defaultReferenceEt: (import.meta.env.VITE_OPENET_REFERENCE_ET ?? "gridMET") as OpenEtReferenceEt,
   defaultUnits: (import.meta.env.VITE_OPENET_UNITS ?? "mm") as OpenEtUnits,
   defaultVersion: Number(import.meta.env.VITE_OPENET_VERSION ?? 2.1),
-  maxAvailableDate: import.meta.env.VITE_OPENET_MAX_AVAILABLE_DATE || "2025-12-31",
+  maxAvailableDate: import.meta.env.VITE_OPENET_MAX_AVAILABLE_DATE || undefined,
   defaultInterval: "daily" as OpenEtInterval,
   endpoints: {
     accountStatus: "/account/status",
@@ -83,8 +83,8 @@ export const openEtConfig = {
     geodatabaseBoundaries: "/geodatabase/metadata/boundaries",
   },
   variables: {
-    requiredForWater3d: ["ET", "ETo", "PR"] satisfies OpenEtVariable[],
-    optionalForWater3d: ["ETof", "NDVI", "MODEL_COUNT"] satisfies OpenEtVariable[],
+    requiredForWater3d: ["ET", "ETo"] satisfies OpenEtVariable[],
+    optionalForWater3d: ["PR", "ETof", "NDVI", "MODEL_COUNT"] satisfies OpenEtVariable[],
   },
 };
 

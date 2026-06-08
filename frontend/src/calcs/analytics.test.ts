@@ -33,9 +33,32 @@ describe("Water 3D calculations", () => {
   });
 
   it("builds a crop-aware analytics snapshot", () => {
-    const snapshot = buildAnalyticsSnapshot(defaultFields[0], cropProfiles.almond, [record], [0]);
+    const field = { ...defaultFields[0], stageStartDate: "2024-01-01" };
+    const snapshot = buildAnalyticsSnapshot(field, cropProfiles.almond, [record], [0]);
     expect(snapshot.currentGdd).toBe(13);
     expect(snapshot.cumulativeEtcMm).toBeGreaterThan(0);
     expect(snapshot.chillRequirement).toBe(65);
+  });
+
+  it("starts analytics accumulation at the field stage start date", () => {
+    const field = { ...defaultFields[0], stageStartDate: "2024-03-02" };
+    const snapshot = buildAnalyticsSnapshot(field, cropProfiles.almond, [record], [0]);
+    expect(snapshot.records).toHaveLength(0);
+    expect(snapshot.currentGdd).toBe(0);
+  });
+
+  it("uses field-specific crop stage thresholds when configured", () => {
+    const field = {
+      ...defaultFields[0],
+      stageStartDate: "2024-01-01",
+      stageThresholds: [
+        { label: "Custom dormancy", gdd: 0 },
+        { label: "Custom bloom", gdd: 10 },
+        { label: "Custom harvest", gdd: 500 },
+      ],
+    };
+    const snapshot = buildAnalyticsSnapshot(field, cropProfiles.almond, [record], [0]);
+    expect(snapshot.currentStage.label).toBe("Custom bloom");
+    expect(snapshot.nextStage?.label).toBe("Custom harvest");
   });
 });

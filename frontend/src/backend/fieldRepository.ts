@@ -1,4 +1,4 @@
-import type { FieldConfig } from "../types/domain";
+import type { FieldConfig, StageThreshold } from "../types/domain";
 import { toIsoDate } from "../utils/dateRange";
 import { backendConfig } from "../config/backend";
 import { getPocketBaseClient, isPocketBaseEnabled } from "./pocketbaseClient";
@@ -56,7 +56,10 @@ export class PocketBaseFieldRepository implements FieldRepository {
 export const pocketBaseFieldRepository = new PocketBaseFieldRepository();
 
 export function toPocketBasePayload(field: FieldConfig): Record<string, unknown> {
+  const pb = getPocketBaseClient();
+
   return {
+    owner: pb.authStore.model?.id,
     name: field.name,
     cropId: field.cropId,
     cropLabel: field.cropLabel,
@@ -73,6 +76,9 @@ export function toPocketBasePayload(field: FieldConfig): Record<string, unknown>
     rootDepthM: field.rootDepthM,
     madFraction: field.madFraction,
     stageStartDate: field.stageStartDate,
+    metadata: {
+      stageThresholds: field.stageThresholds,
+    },
     irrigationEfficiency: field.irrigationEfficiency,
     weatherCell: field.weatherCell,
     elevationFt: field.elevationFt,
@@ -98,6 +104,7 @@ export function fromPocketBaseRecord(record: Record<string, unknown>): FieldConf
     rootDepthM: Number(record.rootDepthM ?? 1),
     madFraction: Number(record.madFraction ?? 0.5),
     stageStartDate: String(record.stageStartDate ?? toIsoDate(new Date())),
+    stageThresholds: parseStageThresholds(record.metadata),
     irrigationEfficiency: Number(record.irrigationEfficiency ?? 0.85),
     weatherCell: String(record.weatherCell ?? "Pending weather grid lookup"),
     elevationFt: Number(record.elevationFt ?? 0),
@@ -111,4 +118,36 @@ function optionalString(value: unknown): string | undefined {
 function optionalNumber(value: unknown): number | undefined {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseStageThresholds(metadata: unknown): StageThreshold[] | undefined {
+  if (!metadata || typeof metadata !== "object") {
+    return undefined;
+  }
+
+  const thresholds = (metadata as Record<string, unknown>).stageThresholds;
+  if (!Array.isArray(thresholds)) {
+    return undefined;
+  }
+
+  const parsed = thresholds
+    .map((threshold) => {
+      if (!threshold || typeof threshold !== "object") {
+        return null;
+      }
+
+      const record = threshold as Record<string, unknown>;
+      const gdd = Number(record.gdd);
+      if (!Number.isFinite(gdd)) {
+        return null;
+      }
+
+      return {
+        label: String(record.label ?? "Stage"),
+        gdd,
+      };
+    })
+    .filter((threshold): threshold is StageThreshold => Boolean(threshold));
+
+  return parsed.length ? parsed : undefined;
 }

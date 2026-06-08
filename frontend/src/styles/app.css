@@ -393,8 +393,8 @@ p {
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
   margin-bottom: 36px;
 }
 
@@ -406,11 +406,11 @@ p {
 }
 
 .metric-card {
-  min-height: 210px;
-  padding: 24px;
+  min-height: 196px;
+  padding: 22px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .metric-header {
@@ -423,12 +423,76 @@ p {
   text-transform: uppercase;
 }
 
+.metric-header > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.metric-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.metric-info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #c4c6cc;
+  border-radius: 999px;
+  background: #f5f3ef;
+  color: #43474c;
+  cursor: help;
+}
+
+.metric-info:focus {
+  outline: 2px solid #061827;
+  outline-offset: 2px;
+}
+
+.metric-info-tooltip {
+  position: absolute;
+  z-index: 20;
+  top: 30px;
+  right: 0;
+  width: min(280px, 72vw);
+  padding: 12px;
+  border: 1px solid #c4c6cc;
+  border-radius: 4px;
+  background: #061827;
+  color: #ffffff;
+  font-family: Geist, Inter, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-transform: none;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+}
+
+.metric-info:hover .metric-info-tooltip,
+.metric-info:focus .metric-info-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .metric-value {
   margin-top: auto;
   color: #061827;
-  font-size: 38px;
+  font-size: 36px;
   line-height: 1;
   font-weight: 800;
+}
+
+.metric-card p {
+  line-height: 1.35;
 }
 
 .metric-warning .metric-value {
@@ -469,12 +533,38 @@ p {
 }
 
 .chart-wrap {
+  position: relative;
   height: 360px;
   min-width: 0;
   overflow: visible;
   border: 1px solid #e4e2de;
   background-image: radial-gradient(#cfe8ca 1px, transparent 1px);
   background-size: 20px 20px;
+}
+
+.chart-loading,
+.chart-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  color: #061827;
+  background: rgba(255, 255, 255, 0.82);
+  font-family: Geist, ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.chart-loading svg {
+  animation: chart-spin 0.9s linear infinite;
+}
+
+@keyframes chart-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .legend {
@@ -502,6 +592,15 @@ p {
 
 .legend .legend-etc::before {
   background: #061827;
+}
+
+.legend .legend-forecast::before {
+  background: #4a7c59;
+}
+
+.legend .legend-forecast-range::before {
+  background: linear-gradient(180deg, #2f5f3c 0 20%, transparent 20% 45%, #86a873 45% 65%, transparent 65%);
+  border: 1px solid #86a873;
 }
 
 .legend .legend-range::before {
@@ -867,6 +966,38 @@ dd {
   accent-color: #061827;
 }
 
+.stage-threshold-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.stage-threshold-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  color: #061827;
+  font-weight: 800;
+}
+
+.stage-threshold-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.stage-threshold-row input {
+  height: 38px;
+  width: 100%;
+  border: 1px solid #c4c6cc;
+  background: #f5f3ef;
+  color: #061827;
+  border-radius: 3px;
+  padding: 0 10px;
+  font-weight: 800;
+}
+
 .activate-card {
   grid-column: 1 / -1;
   background: #061827;
@@ -874,7 +1005,7 @@ dd {
   border-radius: 4px;
   padding: 30px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 260px) auto;
   gap: 24px;
   align-items: center;
 }
@@ -980,6 +1111,12 @@ dd {
 
   .activate-card {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1400px) and (min-width: 1081px) {
+  .metrics-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

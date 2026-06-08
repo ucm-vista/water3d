@@ -1,5 +1,6 @@
 import { getOpenEtUrl, getOpenEtVariableVersion, openEtConfig, openEtVariables, type OpenEtInterval, type OpenEtVariable } from "../config/openet";
 import type { Coordinates, EtDataRequest, EtDataResponse, EtDataVariable, EtProvider } from "./contracts";
+import { pocketBaseOpenEtCacheRepository } from "../backend/openEtCacheRepository";
 
 export interface OpenEtPointTimeseriesRequest extends Coordinates {
   startDate: string;
@@ -19,6 +20,22 @@ export interface OpenEtPointTimeseriesBody {
   version: number;
   file_format: "JSON";
 }
+
+export type OpenEtLoadStage =
+  | "cache-check-start"
+  | "cache-hit"
+  | "cache-miss"
+  | "openet-fetch-start"
+  | "openet-fetch-success"
+  | "cache-save-start"
+  | "cache-save-complete";
+
+export interface OpenEtLoadEvent {
+  stage: OpenEtLoadStage;
+  variable: OpenEtVariable;
+}
+
+export type OpenEtLoadObserver = (event: OpenEtLoadEvent) => void;
 
 export function buildOpenEtPointTimeseriesBody(request: OpenEtPointTimeseriesRequest): OpenEtPointTimeseriesBody {
   return {
@@ -135,16 +152,88 @@ function extractSeriesValue(row: Record<string, unknown>, variable: OpenEtVariab
   return { date, value };
 }
 
+const openEtResponseCache = new Map<string, EtDataResponse>();
+const openEtInFlightRequests = new Map<string, Promise<EtDataResponse>>();
+
+function buildOpenEtRequestKey(request: EtDataRequest, dateRange: { startDate: string; endDate: string }, variables: OpenEtVariable[]): string {
+  return JSON.stringify({
+    cropId: request.cropId,
+    fieldId: request.fieldId,
+    lat: Number(request.lat.toFixed(6)),
+    lon: Number(request.lon.toFixed(6)),
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    interval: openEtConfig.defaultInterval,
+    model: openEtConfig.defaultModel,
+    referenceEt: openEtConfig.defaultReferenceEt,
+    units: openEtConfig.defaultUnits,
+    variables,
+  });
+}
+
 export class OpenEtProvider implements EtProvider {
-  async getEtData(request: EtDataRequest): Promise<EtDataResponse> {
+  async getEtData(request: EtDataRequest, onLoadEvent?: OpenEtLoadObserver): Promise<EtDataResponse> {
     if (!openEtApi.enabled) {
       throw new Error("OpenET is not enabled.");
     }
 
     const variables = openEtConfig.variables.requiredForWater3d;
     const dateRange = getSupportedOpenEtDateRange(request);
+    const requestKey = buildOpenEtRequestKey(request, dateRange, variables);
+    const cached = openEtResponseCache.get(requestKey);
+
+    if (cached) {
+      return cached;
+    }
+
+    const inFlight = openEtInFlightRequests.get(requestKey);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const promise = this.fetchEtData(request, dateRange, variables, onLoadEvent)
+      .then((response) => {
+        openEtResponseCache.set(requestKey, response);
+        return response;
+      })
+      .finally(() => {
+        openEtInFlightRequests.delete(requestKey);
+      });
+
+    openEtInFlightRequests.set(requestKey, promise);
+    return promise;
+  }
+
+  private async fetchEtData(
+    request: EtDataRequest,
+    dateRange: { startDate: string; endDate: string },
+    variables: OpenEtVariable[],
+    onLoadEvent?: OpenEtLoadObserver,
+  ): Promise<EtDataResponse> {
     const responses = await Promise.allSettled(
       variables.map(async (variable) => {
+        const requestBody = buildOpenEtPointTimeseriesBody({
+          ...request,
+          ...dateRange,
+          variable,
+        });
+        const cacheParts = {
+          endpoint: openEtApi.urls.pointTimeseries,
+          request: requestBody,
+        };
+        onLoadEvent?.({ stage: "cache-check-start", variable });
+        const cached = await pocketBaseOpenEtCacheRepository.getVariableResponse(cacheParts);
+
+        if (cached) {
+          onLoadEvent?.({ stage: "cache-hit", variable });
+          return {
+            variable,
+            payload: cached.response,
+          };
+        }
+
+        onLoadEvent?.({ stage: "cache-miss", variable });
+        onLoadEvent?.({ stage: "openet-fetch-start", variable });
         const response = await fetch(openEtApi.urls.pointTimeseries, {
           method: "POST",
           headers: {
@@ -152,13 +241,7 @@ export class OpenEtProvider implements EtProvider {
             accept: openEtApi.headers.accept,
             Authorization: openEtApi.headers.authorization,
           },
-          body: JSON.stringify(
-            buildOpenEtPointTimeseriesBody({
-              ...request,
-              ...dateRange,
-              variable,
-            }),
-          ),
+          body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {
@@ -166,9 +249,15 @@ export class OpenEtProvider implements EtProvider {
           throw new Error(`OpenET ${variable} request failed with ${response.status}${detail ? `: ${detail.slice(0, 240)}` : ""}.`);
         }
 
+        const payload = (await response.json()) as unknown;
+        onLoadEvent?.({ stage: "openet-fetch-success", variable });
+        onLoadEvent?.({ stage: "cache-save-start", variable });
+        await pocketBaseOpenEtCacheRepository.saveVariableResponse(cacheParts, payload);
+        onLoadEvent?.({ stage: "cache-save-complete", variable });
+
         return {
           variable,
-          payload: (await response.json()) as unknown,
+          payload,
         };
       }),
     );

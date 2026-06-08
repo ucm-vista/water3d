@@ -1,4 +1,5 @@
 const DEBUG_STORAGE_KEY = "water3d.debug";
+const CONSOLE_LOG_SOURCES = new Set(["openet", "pocketbase-openet-cache", "climate-toolbox"]);
 
 export type DataSourceStatus = Record<string, unknown>;
 
@@ -32,7 +33,7 @@ export function debugDataSource(source: string, message: string, details?: DataS
     ...(details ?? {}),
   });
 
-  if (!isDebugEnabled()) {
+  if (!CONSOLE_LOG_SOURCES.has(source) && !isDebugEnabled()) {
     return;
   }
 
@@ -41,12 +42,10 @@ export function debugDataSource(source: string, message: string, details?: DataS
 
 export function enableWater3dDebug() {
   localStorage.setItem(DEBUG_STORAGE_KEY, "true");
-  console.info("[Water3D] Data-source debug logging enabled. Reload the page to capture startup events.");
 }
 
 export function disableWater3dDebug() {
   localStorage.removeItem(DEBUG_STORAGE_KEY);
-  console.info("[Water3D] Data-source debug logging disabled.");
 }
 
 if (typeof window !== "undefined") {
