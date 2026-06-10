@@ -1,5 +1,6 @@
 import { Pencil, Plus } from "lucide-react";
 import { useState } from "react";
+import { getCropMetricProfile } from "../data/cropMetrics";
 import type { FieldConfig } from "../types/domain";
 import { FieldMapThumbnail } from "./FieldMapThumbnail";
 import { SetupPanel } from "./SetupPanel";
@@ -49,7 +50,12 @@ export function FieldManager({ fields, selectedFieldId, onSelectField, onCreateF
       </div>
 
       <section className="field-list panel">
-        {fields.map((field) => (
+        {fields.map((field) => {
+          const cropMetrics = getCropMetricProfile(field.cropId);
+          const stageCount = field.stageThresholds?.filter((stage) => typeof stage.gdd === "number").length ?? cropMetrics.gdd.stages.filter((stage) => typeof stage.gdd === "number").length;
+          const gddBase = field.gddBaseTempC ?? cropMetrics.gdd.baseTempC;
+          const gddUpper = field.gddUpperTempC ?? cropMetrics.gdd.upperTempC;
+          return (
           <button
             key={field.id}
             className={`field-row ${field.id === selectedFieldId ? "field-row-active" : ""}`}
@@ -62,24 +68,22 @@ export function FieldManager({ fields, selectedFieldId, onSelectField, onCreateF
             </div>
             <dl className="field-row-data">
               <div>
-                <dt>Soil</dt>
-                <dd>{field.soilComponentName ?? field.soilTexture}</dd>
+                <dt>Plant Date</dt>
+                <dd>{field.stageStartDate}</dd>
               </div>
               <div>
-                <dt>Texture / AWHC</dt>
+                <dt>GDD Model</dt>
                 <dd>
-                  {field.soilTexture} - {Math.round(field.awhcMmPerM)} mm/m
+                  {gddBase}C / {gddUpper}C
                 </dd>
               </div>
               <div>
-                <dt>NRCS Map Unit</dt>
-                <dd>{field.soilMapUnitKey ? `${field.soilMapUnitKey}${field.hydrologicGroup ? ` - HSG ${field.hydrologicGroup}` : ""}` : "Local default"}</dd>
+                <dt>Stages</dt>
+                <dd>{field.stageThresholds?.length ? `${stageCount} custom` : `${stageCount} default`}</dd>
               </div>
               <div>
-                <dt>Location</dt>
-                <dd>
-                  {field.lat.toFixed(3)}, {field.lon.toFixed(3)}
-                </dd>
+                <dt>AWHC / MAD</dt>
+                <dd>{Math.round(field.awhcMmPerM)} mm/m - {Math.round(field.madFraction * 100)}%</dd>
               </div>
             </dl>
             <span
@@ -103,7 +107,8 @@ export function FieldManager({ fields, selectedFieldId, onSelectField, onCreateF
               Edit
             </span>
           </button>
-        ))}
+          );
+        })}
       </section>
     </main>
   );

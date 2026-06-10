@@ -11,7 +11,7 @@ export interface Coordinates {
 }
 
 export interface ApiMetadata {
-  provider: "mapbox" | "openet" | "nrcs-soil-data-access" | "catherine" | "climate" | "local" | "unknown";
+  provider: "mapbox" | "openet" | "open-meteo" | "nrcs-soil-data-access" | "catherine" | "climate" | "local" | "unknown";
   generatedAt?: string;
   qualityFlags?: string[];
   sourceUrl?: string;
@@ -51,6 +51,7 @@ export interface WeatherDataRequest extends ApiDateRange, Coordinates {
   cropId: CropId;
   timezone?: string;
   weatherCellId?: string;
+  includeHourly?: boolean;
 }
 
 export interface WeatherDataResponse {

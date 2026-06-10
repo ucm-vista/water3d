@@ -18,6 +18,6 @@ export function interpolateKc(crop: CropProfile, seasonProgress: number): number
 }
 
 export function seasonProgressFromGdd(crop: CropProfile, cumulativeGdd: number): number {
-  const terminalStage = crop.stages[crop.stages.length - 1];
-  return terminalStage.gdd > 0 ? cumulativeGdd / terminalStage.gdd : 0;
+  const terminalStage = [...crop.stages].reverse().find((stage) => typeof stage.gdd === "number" && stage.gdd > 0);
+  return terminalStage?.gdd ? cumulativeGdd / terminalStage.gdd : 0;
 }

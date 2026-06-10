@@ -6,6 +6,7 @@ export default defineConfig(({ mode }) => {
   const openEtTarget = env.VITE_OPENET_BASE_URL || "https://openet-api.org";
   const soilTarget = env.VITE_SOIL_DATA_ACCESS_BASE_URL || "https://sdmdataaccess.nrcs.usda.gov";
   const climateToolboxTarget = env.VITE_CLIMATE_TOOLBOX_CFS_BASE_URL || "https://climate-dev.nkn.uidaho.edu";
+  const openMeteoTarget = env.VITE_OPEN_METEO_ARCHIVE_BASE_URL || "https://archive-api.open-meteo.com";
 
   return {
     plugins: [react()],
@@ -28,6 +29,12 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: true,
           rewrite: (path) => path.replace(/^\/api\/climate-toolbox/, ""),
+        },
+        "/api/open-meteo": {
+          target: openMeteoTarget,
+          changeOrigin: true,
+          secure: true,
+          rewrite: (path) => path.replace(/^\/api\/open-meteo/, ""),
         },
       },
     },

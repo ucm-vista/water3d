@@ -18,6 +18,7 @@ export { mockEtProvider, mockLocationProvider, mockWeatherProvider } from "./moc
 export { buildOpenEtPointTimeseriesBody, openEtApi, toOpenEtVariable } from "./openEt";
 export type { OpenEtPointTimeseriesBody, OpenEtPointTimeseriesRequest } from "./openEt";
 export { openEtProvider } from "./openEt";
+export { openMeteoApi, openMeteoProvider, parseOpenMeteoHistoricalWeather } from "./openMeteo";
 export { climateToolboxApi, climateToolboxProvider, parseClimateToolboxForecastPet, parseClimateToolboxForecastWeather } from "./climate";
 export type { ClimateToolboxForecastPetRequest } from "./climate";
 export { buildSoilDetectionPostBody, buildSoilDetectionQuery, parseSoilDetectionResponse, soilDataAccessApi, soilDataAccessProvider } from "./soil";

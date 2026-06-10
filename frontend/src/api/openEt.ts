@@ -1,6 +1,7 @@
 import { getOpenEtUrl, getOpenEtVariableVersion, openEtConfig, openEtVariables, type OpenEtInterval, type OpenEtVariable } from "../config/openet";
 import type { Coordinates, EtDataRequest, EtDataResponse, EtDataVariable, EtProvider } from "./contracts";
 import { pocketBaseOpenEtCacheRepository } from "../backend/openEtCacheRepository";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 
 export interface OpenEtPointTimeseriesRequest extends Coordinates {
   startDate: string;
@@ -234,7 +235,7 @@ export class OpenEtProvider implements EtProvider {
 
         onLoadEvent?.({ stage: "cache-miss", variable });
         onLoadEvent?.({ stage: "openet-fetch-start", variable });
-        const response = await fetch(openEtApi.urls.pointTimeseries, {
+        const response = await fetchWithTimeout(openEtApi.urls.pointTimeseries, {
           method: "POST",
           headers: {
             "content-type": "application/json",

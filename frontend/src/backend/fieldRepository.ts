@@ -1,5 +1,5 @@
 import type { FieldConfig, StageThreshold } from "../types/domain";
-import { toIsoDate } from "../utils/dateRange";
+import { getCurrentYearStartDate } from "../utils/dateRange";
 import { backendConfig } from "../config/backend";
 import { getPocketBaseClient, isPocketBaseEnabled } from "./pocketbaseClient";
 
@@ -77,6 +77,8 @@ export function toPocketBasePayload(field: FieldConfig): Record<string, unknown>
     madFraction: field.madFraction,
     stageStartDate: field.stageStartDate,
     metadata: {
+      gddBaseTempC: field.gddBaseTempC,
+      gddUpperTempC: field.gddUpperTempC,
       stageThresholds: field.stageThresholds,
     },
     irrigationEfficiency: field.irrigationEfficiency,
@@ -103,7 +105,9 @@ export function fromPocketBaseRecord(record: Record<string, unknown>): FieldConf
     drainageClass: optionalString(record.drainageClass),
     rootDepthM: Number(record.rootDepthM ?? 1),
     madFraction: Number(record.madFraction ?? 0.5),
-    stageStartDate: String(record.stageStartDate ?? toIsoDate(new Date())),
+    stageStartDate: String(record.stageStartDate ?? getCurrentYearStartDate()),
+    gddBaseTempC: parseMetadataNumber(record.metadata, "gddBaseTempC"),
+    gddUpperTempC: parseMetadataNumber(record.metadata, "gddUpperTempC"),
     stageThresholds: parseStageThresholds(record.metadata),
     irrigationEfficiency: Number(record.irrigationEfficiency ?? 0.85),
     weatherCell: String(record.weatherCell ?? "Pending weather grid lookup"),
@@ -131,23 +135,34 @@ function parseStageThresholds(metadata: unknown): StageThreshold[] | undefined {
   }
 
   const parsed = thresholds
-    .map((threshold) => {
+    .map((threshold): StageThreshold | null => {
       if (!threshold || typeof threshold !== "object") {
         return null;
       }
 
       const record = threshold as Record<string, unknown>;
-      const gdd = Number(record.gdd);
-      if (!Number.isFinite(gdd)) {
+      const rawGdd = record.gdd;
+      const gdd = rawGdd === null ? null : Number(rawGdd);
+      if (rawGdd !== null && !Number.isFinite(gdd)) {
         return null;
       }
 
       return {
         label: String(record.label ?? "Stage"),
         gdd,
+        note: optionalString(record.note),
+        confidence: optionalString(record.confidence) as StageThreshold["confidence"],
       };
     })
-    .filter((threshold): threshold is StageThreshold => Boolean(threshold));
+    .filter((threshold): threshold is StageThreshold => threshold !== null);
 
   return parsed.length ? parsed : undefined;
+}
+
+function parseMetadataNumber(metadata: unknown, key: string): number | undefined {
+  if (!metadata || typeof metadata !== "object") {
+    return undefined;
+  }
+
+  return optionalNumber((metadata as Record<string, unknown>)[key]);
 }

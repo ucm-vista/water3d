@@ -1,5 +1,6 @@
 import { climateToolboxConfig, getClimateToolboxCfsUrl } from "../config/climate";
 import { debugDataSource } from "../utils/debug";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 import type { Coordinates, EtDataResponse, WeatherDataRequest, WeatherDataResponse } from "./contracts";
 import type { WeatherRecord } from "../types/domain";
 
@@ -413,7 +414,7 @@ export class ClimateToolboxProvider {
     url.searchParams.set("lat", String(location.lat));
     url.searchParams.set("lon", String(location.lon));
 
-    const response = await fetch(url.toString());
+    const response = await fetchWithTimeout(url.toString());
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
       throw new Error(`Climate Toolbox ${variable} forecast request failed with ${response.status}${detail ? `: ${detail.slice(0, 240)}` : ""}.`);

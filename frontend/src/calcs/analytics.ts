@@ -35,8 +35,9 @@ export function buildAnalyticsSnapshot(
   });
 
   const currentGdd = records.at(-1)?.cumulativeGdd ?? 0;
-  const currentStage = effectiveCrop.stages.reduce((active, stage) => (currentGdd >= stage.gdd ? stage : active), effectiveCrop.stages[0]);
-  const nextStage = effectiveCrop.stages.find((stage) => stage.gdd > currentGdd);
+  const numericStages = effectiveCrop.stages.filter((stage) => typeof stage.gdd === "number");
+  const currentStage = numericStages.reduce((active, stage) => (typeof stage.gdd === "number" && currentGdd >= stage.gdd ? stage : active), numericStages[0] ?? effectiveCrop.stages[0]);
+  const nextStage = numericStages.find((stage) => typeof stage.gdd === "number" && stage.gdd > currentGdd);
   const currentKc = records.at(-1)?.kc ?? effectiveCrop.kcCurve[0].kc;
   const cumulativeEtoMm = Number(weather.reduce((total, record) => total + record.etoMm, 0).toFixed(1));
   const latestVpd = [...records].reverse().find((record) => typeof record.vpdKpa === "number")?.vpdKpa;
@@ -46,7 +47,7 @@ export function buildAnalyticsSnapshot(
 
   const insights = [
     nextStage
-      ? `${nextStage.label} is ${Math.max(0, Math.round(nextStage.gdd - currentGdd))} GDD away at current accumulation.`
+      ? `${nextStage.label} is ${Math.max(0, Math.round((nextStage.gdd ?? 0) - currentGdd))} GDD away at current accumulation.`
       : "The field has reached the final configured stage for this crop profile.",
     `OpenET-style ETc is ${Math.abs(cumulativeEtcMm - cumulativeEtoMm).toFixed(1)} mm ${cumulativeEtcMm >= cumulativeEtoMm ? "above" : "below"} reference ETo for the selected period.`,
     latestVpd && latestVpd >= crop.stress.highVpdKpa

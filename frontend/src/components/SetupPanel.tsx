@@ -4,17 +4,13 @@ import type React from "react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { soilDataAccessApi, soilDataAccessProvider } from "../api";
 import { cropOptions } from "../data/crops";
+import { getCropMetricProfile } from "../data/cropMetrics";
 import { mapboxConfig } from "../config/mapbox";
 import type { CropId, FieldConfig, StageThreshold } from "../types/domain";
 import { debugDataSource } from "../utils/debug";
-import { toIsoDate } from "../utils/dateRange";
+import { getCurrentYearStartDate } from "../utils/dateRange";
 
 const FieldSetupMap = lazy(() => import("./FieldSetupMap"));
-
-function currentYearStartDate(): string {
-  const now = new Date();
-  return toIsoDate(new Date(Date.UTC(now.getFullYear(), 0, 1)));
-}
 
 type SearchRetrieveResult = {
   features: Array<{
@@ -48,8 +44,10 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, field }: Se
     elevationFt: field?.elevationFt ?? 342,
   });
   const [soilStatus, setSoilStatus] = useState(soilDataAccessApi.enabled ? "Detecting soil..." : "Using local defaults");
+  const [useCustomStages, setUseCustomStages] = useState(Boolean(field?.stageThresholds?.length));
   const isEditing = Boolean(field);
   const selectedCrop = cropOptions.find((option) => option.id === selectedCropId) ?? cropOptions[0];
+  const selectedCropMetrics = getCropMetricProfile(selectedCrop.id);
 
   useEffect(() => {
     let ignore = false;
@@ -143,14 +141,22 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, field }: Se
     const cropId = selectedCropId;
     const crop = cropOptions.find((option) => option.id === cropId) ?? cropOptions[0];
     const fieldName = String(form.get("fieldName") || "New Field");
-    const plantingDate = String(form.get("plantingDate") || field?.stageStartDate || currentYearStartDate());
-    const stageThresholds = crop.stages.map((stage, index): StageThreshold => {
+    const plantingDate = String(form.get("plantingDate") || field?.stageStartDate || getCurrentYearStartDate());
+    const cropMetrics = getCropMetricProfile(crop.id);
+    const stageThresholds = useCustomStages ? cropMetrics.gdd.stages.map((stage, index): StageThreshold => {
       const gdd = Number(form.get(`stageGdd-${index}`));
       return {
+        ...stage,
         label: stage.label,
-        gdd: Number.isFinite(gdd) ? gdd : stage.gdd,
+        gdd: stage.gdd === null ? null : Number.isFinite(gdd) ? gdd : stage.gdd,
       };
-    });
+    }) : undefined;
+    const rootDepthM = readPositiveNumber(form, "rootDepthM", field?.rootDepthM ?? crop.rootDepthM);
+    const madFraction = readPositiveNumber(form, "madPercent", (field?.madFraction ?? crop.madFraction) * 100) / 100;
+    const awhcMmPerM = readPositiveNumber(form, "awhcMmPerM", detectedProperties.awhcMmPerM ?? crop.tawMmPerM);
+    const irrigationEfficiency = readPositiveNumber(form, "irrigationEfficiencyPercent", (field?.irrigationEfficiency ?? 0.85) * 100) / 100;
+    const gddBaseTempC = readNumber(form, "gddBaseTempC", field?.gddBaseTempC ?? cropMetrics.gdd.baseTempC);
+    const gddUpperTempC = readNumber(form, "gddUpperTempC", field?.gddUpperTempC ?? cropMetrics.gdd.upperTempC);
 
     const nextField: FieldConfig = {
       id: field?.id ?? `${fieldName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`,
@@ -160,18 +166,20 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, field }: Se
       lat: location.lat,
       lon: location.lon,
       soilTexture: detectedProperties.soilTexture,
-      awhcMmPerM: detectedProperties.awhcMmPerM ?? crop.tawMmPerM,
+      awhcMmPerM,
       soilMapUnitKey: detectedProperties.soilMapUnitKey,
       soilMapUnitName: detectedProperties.soilMapUnitName,
       soilComponentName: detectedProperties.soilComponentName,
       soilComponentPercent: detectedProperties.soilComponentPercent,
       hydrologicGroup: detectedProperties.hydrologicGroup,
       drainageClass: detectedProperties.drainageClass,
-      rootDepthM: crop.rootDepthM,
-      madFraction: crop.madFraction,
+      rootDepthM,
+      madFraction,
       stageStartDate: plantingDate,
+      gddBaseTempC,
+      gddUpperTempC,
       stageThresholds,
-      irrigationEfficiency: field?.irrigationEfficiency ?? 0.85,
+      irrigationEfficiency,
       weatherCell: detectedProperties.weatherCell,
       elevationFt: detectedProperties.elevationFt,
     };
@@ -283,48 +291,114 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, field }: Se
 
           <section className="panel crop-card">
             <h2>2. Select Crop</h2>
-            {cropOptions.map((crop) => (
-              <label key={crop.id} className="crop-option">
-                <input
-                  type="radio"
-                  name="cropId"
-                  value={crop.id}
-                  checked={selectedCropId === crop.id}
-                  onChange={() => setSelectedCropId(crop.id)}
-                />
-                <span>{crop.varietyHint ? `${crop.label} (${crop.varietyHint})` : crop.label}</span>
-              </label>
-            ))}
-          </section>
-
-          <section className="panel stage-threshold-card">
-            <h2>3. Stage Thresholds</h2>
-            <div className="stage-threshold-list">
-              {selectedCrop.stages.map((stage, index) => {
-                const override = field?.cropId === selectedCrop.id ? field.stageThresholds?.[index] : undefined;
-                return (
-                  <label key={`${selectedCrop.id}-${stage.label}`} className="stage-threshold-row">
-                    <span>{stage.label}</span>
-                    <input name={`stageGdd-${index}`} type="number" min="0" step="1" defaultValue={override?.gdd ?? stage.gdd} />
-                  </label>
-                );
-              })}
+            <div className="crop-option-grid">
+              {cropOptions.map((crop) => (
+                <label key={crop.id} className="crop-option">
+                  <input
+                    type="radio"
+                    name="cropId"
+                    value={crop.id}
+                    checked={selectedCropId === crop.id}
+                    onChange={() => setSelectedCropId(crop.id)}
+                  />
+                  <span>{crop.varietyHint ? `${crop.label} (${crop.varietyHint})` : crop.label}</span>
+                </label>
+              ))}
             </div>
           </section>
         </aside>
 
+        <section key={`parameters-${selectedCrop.id}`} className="panel parameter-card setup-wide-panel">
+          <div className="section-title-row">
+            <div>
+              <h2>3. Season & GDD Defaults</h2>
+              <p>These crop defaults are used by the graph and analytics unless the farmer adjusts them.</p>
+            </div>
+          </div>
+          <div className="parameter-grid">
+            <label>
+              <span>Plant / Biofix Date</span>
+              <input name="plantingDate" type="date" defaultValue={field?.stageStartDate ?? getCurrentYearStartDate()} />
+            </label>
+            <label>
+              <span>GDD Base Temp (C)</span>
+              <input name="gddBaseTempC" type="number" step="0.1" defaultValue={field?.gddBaseTempC ?? selectedCropMetrics.gdd.baseTempC} />
+            </label>
+            <label>
+              <span>GDD Upper Temp (C)</span>
+              <input name="gddUpperTempC" type="number" step="0.1" defaultValue={field?.gddUpperTempC ?? selectedCropMetrics.gdd.upperTempC} />
+            </label>
+            <label>
+              <span>Root Depth (m)</span>
+              <input name="rootDepthM" type="number" min="0.1" step="0.1" defaultValue={field?.rootDepthM ?? selectedCrop.rootDepthM} />
+            </label>
+            <label>
+              <span>MAD (%)</span>
+              <input name="madPercent" type="number" min="1" max="100" step="1" defaultValue={Math.round((field?.madFraction ?? selectedCrop.madFraction) * 100)} />
+            </label>
+            <label>
+              <span>AWHC (mm/m)</span>
+              <input name="awhcMmPerM" type="number" min="1" step="1" defaultValue={Math.round(detectedProperties.awhcMmPerM ?? selectedCrop.tawMmPerM)} />
+            </label>
+            <label>
+              <span>Irrigation Efficiency (%)</span>
+              <input name="irrigationEfficiencyPercent" type="number" min="1" max="100" step="1" defaultValue={Math.round((field?.irrigationEfficiency ?? 0.85) * 100)} />
+            </label>
+          </div>
+        </section>
+
+        <section className="panel stage-threshold-card setup-wide-panel">
+          <div className="section-title-row">
+            <div>
+              <h2>4. Growth Stage Thresholds</h2>
+              <p>Use the crop defaults, or switch to custom thresholds when local variety or management timing differs.</p>
+            </div>
+            <div className="stage-mode-row">
+              <label>
+                <input type="radio" name="stageMode" checked={!useCustomStages} onChange={() => setUseCustomStages(false)} />
+                <span>Use crop defaults</span>
+              </label>
+              <label>
+                <input type="radio" name="stageMode" checked={useCustomStages} onChange={() => setUseCustomStages(true)} />
+                <span>Customize GDD stages</span>
+              </label>
+            </div>
+          </div>
+          <div className="stage-threshold-list">
+            {selectedCropMetrics.gdd.stages.map((stage, index) => {
+              const override = field?.cropId === selectedCrop.id ? field.stageThresholds?.[index] : undefined;
+              return (
+                <label key={`${selectedCrop.id}-${stage.label}`} className="stage-threshold-row">
+                  <span>{stage.label}</span>
+                  {stage.gdd === null ? (
+                    <em>{stage.note ?? "No GDD threshold"}</em>
+                  ) : (
+                    <input name={`stageGdd-${index}`} type="number" min="0" step="1" defaultValue={override?.gdd ?? stage.gdd} disabled={!useCustomStages} />
+                  )}
+                </label>
+              );
+            })}
+          </div>
+        </section>
+
         <section className="activate-card">
           <div>
-            <h2>4. Name Your Field</h2>
+            <h2>5. Name Your Field</h2>
             <input name="fieldName" placeholder="e.g. West Orchard Sector 4" defaultValue={field?.name ?? ""} required />
-          </div>
-          <div>
-            <h2>5. Planting / Stage Start</h2>
-            <input name="plantingDate" type="date" defaultValue={field?.stageStartDate ?? ""} />
           </div>
           <button type="submit">{isEditing ? "Save Field Changes" : "Activate Field Monitoring"}</button>
         </section>
       </form>
     </main>
   );
+}
+
+function readNumber(form: FormData, key: string, fallback: number): number {
+  const value = Number(form.get(key));
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function readPositiveNumber(form: FormData, key: string, fallback: number): number {
+  const value = readNumber(form, key, fallback);
+  return value > 0 ? value : fallback;
 }

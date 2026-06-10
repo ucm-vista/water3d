@@ -4,7 +4,9 @@ export type WeatherSource = "historical" | "forecast";
 
 export interface StageThreshold {
   label: string;
-  gdd: number;
+  gdd: number | null;
+  note?: string;
+  confidence?: "placeholder" | "provisional" | "source-backed" | "mock";
 }
 
 export interface KcPoint {
@@ -51,6 +53,8 @@ export interface FieldConfig {
   rootDepthM: number;
   madFraction: number;
   stageStartDate: string;
+  gddBaseTempC?: number;
+  gddUpperTempC?: number;
   stageThresholds?: StageThreshold[];
   irrigationEfficiency: number;
   weatherCell: string;

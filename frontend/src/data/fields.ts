@@ -1,6 +1,6 @@
 import type { FieldConfig } from "../types/domain";
 import { cropProfiles } from "./crops";
-import { toIsoDate } from "../utils/dateRange";
+import { getCurrentYearStartDate } from "../utils/dateRange";
 
 const almond = cropProfiles.almond;
 
@@ -16,7 +16,7 @@ export const defaultFields: FieldConfig[] = [
     awhcMmPerM: almond.tawMmPerM,
     rootDepthM: almond.rootDepthM,
     madFraction: almond.madFraction,
-    stageStartDate: toIsoDate(new Date()),
+    stageStartDate: getCurrentYearStartDate(),
     irrigationEfficiency: 0.85,
     weatherCell: "Grid ID #4829",
     elevationFt: 342,

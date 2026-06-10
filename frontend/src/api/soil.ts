@@ -1,4 +1,5 @@
 import { getSoilDataAccessUrl, soilDataAccessConfig } from "../config/soil";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout";
 import type { Coordinates, FieldSetupContext, LocationProvider, LocationSearchResult } from "./contracts";
 
 export interface SoilDetectionRequest extends Coordinates {
@@ -170,7 +171,7 @@ export class SoilDataAccessProvider implements Pick<LocationProvider, "search" |
       throw new Error("NRCS Soil Data Access is not enabled.");
     }
 
-    const response = await fetch(soilDataAccessApi.url, {
+    const response = await fetchWithTimeout(soilDataAccessApi.url, {
       method: "POST",
       headers: {
         "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
