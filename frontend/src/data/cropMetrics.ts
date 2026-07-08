@@ -316,6 +316,23 @@ export const cropMetricProfiles: Record<CropId, CropMetricProfile> = {
     comparisonYears: [2023, 2024, 2025],
     notes: ["Tbase/Tupper now come from Paredes et al. 2025. Later implementation should support reset after each cutting."],
   },
+  other: {
+    cropId: "other",
+    displayName: "Custom Crop",
+    perennial: false,
+    gdd: {
+      baseTempC: 10,
+      upperTempC: 30,
+      method: "simple-average",
+      biofixLabel: "Season start date",
+      confidence: "mock",
+      stages: [],
+      sources: [],
+    },
+    chill: { enabled: false, unitLabel: "Chill Hours", defaultStartRule: "none", confidence: "mock", sources: [] },
+    comparisonYears: [2023, 2024, 2025],
+    notes: ["User-defined crop. Base/upper temperatures and growth stages are entered manually; no source-backed defaults apply."],
+  },
 };
 
 export function getCropMetricProfile(cropId: CropId): CropMetricProfile {

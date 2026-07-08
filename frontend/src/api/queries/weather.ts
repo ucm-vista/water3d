@@ -147,15 +147,16 @@ export interface YearWeatherResult {
   isFetching: boolean;
 }
 
-// Per-year temperature-profile history for the comparison + 5-yr-normal
-// overlays. One cached query per year, so toggling which years are shown never
+// Per-year history (temps + reference ET) for the comparison + 5-yr-normal
+// overlays — temps drive the GDD overlays, reference ETo drives the ET overlays.
+// One cached query per year, so toggling which years are shown never
 // refetches a year already loaded this session. Prior years get a long TTL
 // (immutable); the current year a short one (still accumulating).
 export function useYearWeather(params: YearWeatherParams): YearWeatherResult {
   const { cropId, lat, lon, years, currentYear } = params;
   return useQueries({
     queries: years.map((year) => ({
-      queryKey: weatherKeys.year(lat, lon, year, "temperature" as const),
+      queryKey: weatherKeys.year(lat, lon, year, "temperature_et" as const),
       enabled: gridMetApi.enabled,
       staleTime: year >= currentYear ? TTL.currentYearWeather : TTL.priorYearWeather,
       queryFn: async (): Promise<WeatherRecord[]> => {
@@ -165,7 +166,7 @@ export function useYearWeather(params: YearWeatherParams): YearWeatherResult {
           lon,
           startDate: `${year}-01-01`,
           endDate: `${year}-12-31`,
-          variableProfile: "temperature",
+          variableProfile: "temperature_et",
         });
         return response.records;
       },

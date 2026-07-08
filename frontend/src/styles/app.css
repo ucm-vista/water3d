@@ -928,6 +928,18 @@ p {
 
 /* Footer note styled to match the sidebar: muted Geist-mono body with the same
    orange left-bar marker used on sidebar section headings. */
+.stage-timeline-empty {
+  margin: 8px 0 0;
+  padding: 18px;
+  border: 1px dashed #c4c6cc;
+  border-radius: 4px;
+  font-family: Geist, ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #687078;
+  text-align: center;
+}
+
 .stage-timeline-footnote {
   position: relative;
   margin-top: 16px;
@@ -957,6 +969,56 @@ p {
   flex-wrap: wrap;
   color: #43474c;
   font-weight: 700;
+}
+
+.legend-info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 2px;
+  color: #687078;
+  cursor: help;
+}
+
+.legend-info:focus {
+  outline: 2px solid #061827;
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+.legend-info-tooltip {
+  position: absolute;
+  z-index: 20;
+  bottom: 24px;
+  left: 50%;
+  transform: translate(-50%, 4px);
+  width: max-content;
+  max-width: min(280px, 72vw);
+  padding: 10px 12px;
+  border: 1px solid #c4c6cc;
+  border-radius: 4px;
+  background: #061827;
+  color: #ffffff;
+  font-family: Geist, Inter, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-transform: none;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+}
+
+.legend-info:hover .legend-info-tooltip,
+.legend-info:focus .legend-info-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 
@@ -1382,6 +1444,22 @@ dd {
 
 .crop-select-summary {
   margin: 0;
+  color: #43474c;
+  font-family: Geist, ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.custom-crop-name {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.custom-crop-name > span {
   color: #43474c;
   font-family: Geist, ui-monospace, monospace;
   font-size: 11px;

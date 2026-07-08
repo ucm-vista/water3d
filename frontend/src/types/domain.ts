@@ -1,4 +1,4 @@
-export type CropId = "almond" | "tomato" | "wineGrape" | "alfalfa" | "pistachio" | "cotton";
+export type CropId = "almond" | "tomato" | "wineGrape" | "alfalfa" | "pistachio" | "cotton" | "other";
 
 export type WeatherSource = "historical" | "forecast";
 
@@ -88,6 +88,7 @@ export interface DailyAnalytics {
   kc: number;
   etcMm: number;
   cumulativeEtcMm: number;
+  cumulativeEtoMm: number;
   vpdKpa?: number;
 }
 

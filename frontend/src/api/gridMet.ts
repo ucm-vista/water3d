@@ -120,9 +120,13 @@ export function getGridMetAvailableThrough(qualityFlags: string[] | undefined): 
 // per profile and the timeout is far above the fetch default.
 const GRIDMET_TIMEOUT_MS = 90_000;
 
-const VARIABLE_PROFILES: Record<"full" | "temperature", { required: GridMetVariableCode[]; optional: GridMetVariableCode[] }> = {
+const VARIABLE_PROFILES: Record<"full" | "temperature" | "temperature_et", { required: GridMetVariableCode[]; optional: GridMetVariableCode[] }> = {
   full: { required: ["tmmn", "tmmx", "pet"], optional: ["pr", "rmax", "rmin", "vpd"] },
   temperature: { required: ["tmmn", "tmmx"], optional: [] },
+  // Temps + reference ET (pet) for the year-over-year overlays: GDD needs the
+  // temperatures, the ET view needs reference ETo. One extra request per year
+  // versus "temperature", without the humidity/precip/vpd of the "full" pull.
+  temperature_et: { required: ["tmmn", "tmmx", "pet"], optional: [] },
 };
 
 export class GridMetProvider {

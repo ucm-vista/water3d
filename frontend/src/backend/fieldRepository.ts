@@ -66,6 +66,11 @@ export const pocketBaseFieldRepository = new PocketBaseFieldRepository();
 export function toPocketBasePayload(field: FieldConfig): Record<string, unknown> {
   const pb = getPocketBaseClient();
 
+  // The `fields` collection marks soilTexture, awhcMmPerM, rootDepthM,
+  // madFraction, irrigationEfficiency, and weatherCell as required, but a
+  // freshly created field leaves them undefined. Coalesce to the same defaults
+  // fromPocketBaseRecord() applies on read so create()/update() never fails a
+  // required-value check and silently drops the field to local-only storage.
   return {
     owner: pb.authStore.model?.id,
     name: field.name,
@@ -73,16 +78,16 @@ export function toPocketBasePayload(field: FieldConfig): Record<string, unknown>
     cropLabel: field.cropLabel,
     lat: field.lat,
     lon: field.lon,
-    soilTexture: field.soilTexture,
-    awhcMmPerM: field.awhcMmPerM,
+    soilTexture: field.soilTexture ?? "Unknown",
+    awhcMmPerM: field.awhcMmPerM ?? 150,
     soilMapUnitKey: field.soilMapUnitKey,
     soilMapUnitName: field.soilMapUnitName,
     soilComponentName: field.soilComponentName,
     soilComponentPercent: field.soilComponentPercent,
     hydrologicGroup: field.hydrologicGroup,
     drainageClass: field.drainageClass,
-    rootDepthM: field.rootDepthM,
-    madFraction: field.madFraction,
+    rootDepthM: field.rootDepthM ?? 1,
+    madFraction: field.madFraction ?? 0.5,
     stageStartDate: field.stageStartDate,
     metadata: {
       gddBaseTempC: field.gddBaseTempC,
@@ -90,8 +95,8 @@ export function toPocketBasePayload(field: FieldConfig): Record<string, unknown>
       stageThresholds: field.stageThresholds,
       areaAcres: field.areaAcres,
     },
-    irrigationEfficiency: field.irrigationEfficiency,
-    weatherCell: field.weatherCell,
+    irrigationEfficiency: field.irrigationEfficiency ?? 0.85,
+    weatherCell: field.weatherCell ?? "Pending weather grid lookup",
     elevationFt: field.elevationFt,
   };
 }

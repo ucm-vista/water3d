@@ -135,6 +135,22 @@ export const cropProfiles: Record<CropId, CropProfile> = {
     tawMmPerM: 140,
     stress: { highVpdKpa: 2.5 },
   },
+  other: {
+    id: "other",
+    label: "Other",
+    tBaseC: 10,
+    tUpperC: 30,
+    kcCurve: [
+      { position: 0, kc: 0.4 },
+      { position: 0.5, kc: 1 },
+      { position: 1, kc: 0.7 },
+    ],
+    stages: [],
+    madFraction: 0.5,
+    rootDepthM: 1,
+    tawMmPerM: 150,
+    stress: { highVpdKpa: 2.5 },
+  },
 };
 
 export const cropOptions = Object.values(cropProfiles);

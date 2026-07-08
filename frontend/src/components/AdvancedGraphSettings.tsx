@@ -32,7 +32,9 @@ const TOGGLE_LABELS: Partial<Record<keyof GraphSeriesVisibility, string>> = {
   projection: "Show projection to year-end",
   dataMarkers: "Show data-point markers",
   etCumulative: "Show crop ET (cumulative ETc)",
-  referenceEt: "Show reference ETo",
+  referenceEt: "Show reference ETo (this year)",
+  etReferencePriorYear: "Show prior-year reference ETo",
+  etReferenceNormal: "Show 5-yr average reference ETo",
   etDailyBars: "Show daily ET bars",
   forecastBand: "Show forecast uncertainty band",
 };
@@ -294,6 +296,17 @@ export function AdvancedGraphSettings({
               <p className="settings-hint">Choose which evapotranspiration curves to display.</p>
               <Toggle label={TOGGLE_LABELS.etCumulative!} checked={settings.show.etCumulative} onChange={() => toggleShow("etCumulative")} />
               <Toggle label={TOGGLE_LABELS.referenceEt!} checked={settings.show.referenceEt} onChange={() => toggleShow("referenceEt")} />
+            </section>
+
+            <section className="settings-section">
+              <h3>Year-over-year comparison</h3>
+              <p className="settings-hint">
+                Overlay reference ETo (atmospheric demand) from prior seasons, aligned to this season by calendar day, so you can
+                see whether this year is running thirstier or milder than usual.
+              </p>
+              <Toggle label={TOGGLE_LABELS.etReferencePriorYear!} checked={settings.show.etReferencePriorYear} onChange={() => toggleShow("etReferencePriorYear")} />
+              <Toggle label={TOGGLE_LABELS.etReferenceNormal!} checked={settings.show.etReferenceNormal} onChange={() => toggleShow("etReferenceNormal")} />
+              <p className="settings-hint">Which prior years overlay is shared with the GDD view’s Comparison Years.</p>
             </section>
 
             <section className="settings-section">

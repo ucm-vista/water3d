@@ -41,9 +41,19 @@ function newFieldDraft(): FieldConfig {
   };
 }
 
-function slugId(name: string): string {
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "field";
-  return `${slug}-${Date.now()}`;
+// PocketBase record ids must be exactly 15 chars matching ^[a-z0-9]+$. A
+// human-readable "slug-timestamp" id violates both the length and the pattern,
+// so create() rejects it and the field silently falls back to local-only
+// storage. Generate a PocketBase-shaped id instead.
+function newFieldId(): string {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = new Uint8Array(15);
+  crypto.getRandomValues(bytes);
+  let id = "";
+  for (const byte of bytes) {
+    id += alphabet[byte % alphabet.length];
+  }
+  return id;
 }
 
 export function SetupPanel({ onCreateField, onUpdateField, onCancel, onGoHome, field }: SetupPanelProps) {
@@ -64,11 +74,12 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, onGoHome, f
 
   function handleSubmit() {
     const name = draft.name.trim() || "New Field";
-    const finalized: FieldConfig = { ...draft, name, cropLabel: cropOptionLabel(draft.cropId) };
+    const cropLabel = draft.cropId === "other" ? draft.cropLabel.trim() || "Custom Crop" : cropOptionLabel(draft.cropId);
+    const finalized: FieldConfig = { ...draft, name, cropLabel };
     if (isEditing && onUpdateField) {
       onUpdateField(finalized);
     } else {
-      onCreateField({ ...finalized, id: finalized.id || slugId(name) });
+      onCreateField({ ...finalized, id: finalized.id || newFieldId() });
     }
   }
 

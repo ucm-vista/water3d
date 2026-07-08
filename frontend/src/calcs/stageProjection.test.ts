@@ -4,7 +4,7 @@ import { averageDailyGddByMonthDay, buildStageProjections, daysAheadOfNormal, fi
 import type { DailyAnalytics, WeatherRecord } from "../types/domain";
 
 function analyticsRecord(date: string, gdd: number, cumulativeGdd: number): DailyAnalytics {
-  return { date, gdd, cumulativeGdd, kc: 1, etcMm: 0, cumulativeEtcMm: 0 };
+  return { date, gdd, cumulativeGdd, kc: 1, etcMm: 0, cumulativeEtcMm: 0, cumulativeEtoMm: 0 };
 }
 
 function weatherRecord(date: string, tminC: number, tmaxC: number): WeatherRecord {

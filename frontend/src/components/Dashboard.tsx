@@ -1,5 +1,5 @@
-import { CalendarClock, Download, Droplets, Gauge, Sprout, ThermometerSun } from "lucide-react";
-import { Area, Bar, Customized, ComposedChart, Line, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CalendarClock, Download, Droplets, Gauge, Info, Sprout, ThermometerSun } from "lucide-react";
+import { Area, Bar, Customized, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useIsRestoring } from "@tanstack/react-query";
 import { climateToolboxApi } from "../api/climate";
 import { gridMetApi } from "../api/gridMet";
@@ -52,6 +52,16 @@ const COMPARISON_YEAR_COLORS = ["#a87945", "#7d8b52", "#b26046"];
 
 function comparisonYearColor(index: number): string {
   return COMPARISON_YEAR_COLORS[index % COMPARISON_YEAR_COLORS.length];
+}
+
+// Reference-ETo year-over-year overlays use a cooler (blue) palette so they read
+// as the "reference ETo" family yet stay distinct from the rust current-season
+// reference ETo line and the crop-ET / daily-bar colors.
+const ETO_COMPARISON_YEAR_COLORS = ["#5f8fc0", "#4f8a8b", "#8a86c9"];
+const ETO_NORMAL_COLOR = "#3f6486";
+
+function etoComparisonYearColor(index: number): string {
+  return ETO_COMPARISON_YEAR_COLORS[index % ETO_COMPARISON_YEAR_COLORS.length];
 }
 
 interface OverlayLabelItem {
@@ -203,6 +213,9 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   const yearEndDate = `${currentYear}-12-31`;
   const crop = cropProfiles[field.cropId];
   const cropMetrics = getCropMetricProfile(field.cropId);
+  // For the "other" crop the user supplies the name, so prefer the field's
+  // custom label over the generic metric-profile display name.
+  const cropDisplayName = field.cropId === "other" ? field.cropLabel.trim() || cropMetrics.displayName : cropMetrics.displayName;
   const metricStages = field.stageThresholds?.length ? field.stageThresholds : cropMetrics.gdd.stages;
 
   // Default overlays: most-recent prior year + 5-yr average only. Additional
@@ -399,6 +412,32 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
     () => averageDailyGddByMonthDay(baselineWeatherByYear, metricCrop),
     [baselineWeatherByYear, metricCrop],
   );
+
+  // Reference-ETo (atmospheric demand) year-over-year overlays for the ET view,
+  // aligned by calendar day (MM-DD) like the GDD overlays. Deliberately built
+  // from cumulative *reference* ETo rather than crop ETc: ETc rides the Kc/stage
+  // curve, whose timing shifts year to year, so ETo isolates the weather-year
+  // difference that a "was this a thirstier season" comparison actually wants.
+  const etoNormalCumulativeByMonthDay = useMemo(() => {
+    const buckets = new Map<string, { sum: number; count: number }>();
+    for (const baselineSnapshot of baselineSnapshots) {
+      for (const record of baselineSnapshot.records) {
+        const key = record.date.slice(5);
+        const bucket = buckets.get(key) ?? { sum: 0, count: 0 };
+        bucket.sum += record.cumulativeEtoMm;
+        bucket.count += 1;
+        buckets.set(key, bucket);
+      }
+    }
+    return new Map([...buckets.entries()].map(([key, bucket]) => [key, Number((bucket.sum / bucket.count).toFixed(2))]));
+  }, [baselineSnapshots]);
+  const etoComparisonByMonthDay = useMemo(() => {
+    const maps: Record<number, Map<string, number>> = {};
+    for (const [yearKey, comparisonSnapshot] of Object.entries(comparisonSnapshotsByYear)) {
+      maps[Number(yearKey)] = new Map(comparisonSnapshot.records.map((record) => [record.date.slice(5), record.cumulativeEtoMm]));
+    }
+    return maps;
+  }, [comparisonSnapshotsByYear]);
   const normalSeriesFromStart = useMemo(() => {
     if (!normalCumulativeByMonthDay.size) return [] as Array<number | undefined>;
     const seasonEnd = `${getIsoYear(selectedStartDate)}-12-31`;
@@ -517,7 +556,15 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
     return snapshot.records.filter((record) => record.date <= actualEndDate).map((record) => {
       const weather = weatherByDate.get(record.date);
       const isForecast = weather?.source === "forecast";
+      const monthDay = record.date.slice(5);
       cumulativeEto += weather?.etoMm ?? 0;
+      const etoNormal = etoNormalCumulativeByMonthDay.get(monthDay);
+      const comparisonEto = Object.fromEntries(
+        selectedComparisonYears.map((year) => {
+          const value = etoComparisonByMonthDay[year]?.get(monthDay);
+          return [`year${year}Eto`, typeof value === "number" ? Number((value * etFactor).toFixed(2)) : undefined];
+        }),
+      );
       return {
         date: formatDateLabel(record.date),
         fullDate: record.date,
@@ -525,6 +572,8 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         dailyEtForecast: isForecast ? Number((record.etcMm * etFactor).toFixed(2)) : undefined,
         cumulativeEt: Number((record.cumulativeEtcMm * etFactor).toFixed(2)),
         cumulativeEto: Number((cumulativeEto * etFactor).toFixed(2)),
+        etoNormal: typeof etoNormal === "number" ? Number((etoNormal * etFactor).toFixed(2)) : undefined,
+        ...comparisonEto,
         petLow: isForecast && typeof weather?.forecastPetP10Mm === "number" ? Number((weather.forecastPetP10Mm * etFactor).toFixed(2)) : undefined,
         petBand:
           isForecast && typeof weather?.forecastPetP10Mm === "number" && typeof weather?.forecastPetP90Mm === "number"
@@ -532,7 +581,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
             : undefined,
       };
     });
-  }, [snapshot.records, weatherByDate, etFactor, actualEndDate]);
+  }, [snapshot.records, weatherByDate, etFactor, actualEndDate, etoNormalCumulativeByMonthDay, etoComparisonByMonthDay, selectedComparisonYears]);
 
   const seasonEtoMm = snapshot.cumulativeEtoMm;
   const observedEtc = snapshot.records.filter((record) => weatherByDate.get(record.date)?.source !== "forecast").at(-1)?.cumulativeEtcMm ?? 0;
@@ -603,7 +652,9 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
       { key: "normalGdd", label: `5-yr Normal Cumulative ${unitLabel}` },
       { key: "etcMm", label: `Crop ET (${etLabel})` },
       { key: "etoMm", label: `Reference ETo (${etLabel})` },
+      { key: "etoNormal", label: `5-yr Normal Cumulative Reference ETo (${etLabel})` },
       ...selectedComparisonYears.map((year) => ({ key: `year${year}`, label: `${year} Cumulative ${unitLabel}` })),
+      ...selectedComparisonYears.map((year) => ({ key: `year${year}Eto`, label: `${year} Cumulative Reference ETo (${etLabel})` })),
       ...(cropMetrics.chill.enabled ? [{ key: "chill", label: "Cumulative Chill Hours" }] : []),
     ];
 
@@ -611,6 +662,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
       const monthDay = record.date.slice(5);
       const weather = weatherByDate.get(record.date);
       const normal = normalCumulativeByMonthDay.get(monthDay);
+      const etoNormal = etoNormalCumulativeByMonthDay.get(monthDay);
       const row: Record<string, string | number | undefined> = {
         date: record.date,
         source: weather?.source ?? "historical",
@@ -621,11 +673,14 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         normalGdd: typeof normal === "number" ? Number((normal * unitFactor).toFixed(1)) : undefined,
         etcMm: Number((record.etcMm * etFactor).toFixed(2)),
         etoMm: typeof weather?.etoMm === "number" ? Number((weather.etoMm * etFactor).toFixed(2)) : undefined,
+        etoNormal: typeof etoNormal === "number" ? Number((etoNormal * etFactor).toFixed(2)) : undefined,
         chill: chillByDate.get(record.date),
       };
       selectedComparisonYears.forEach((year) => {
         const value = comparisonByMonthDay[year]?.get(monthDay);
         row[`year${year}`] = typeof value === "number" ? Number((value * unitFactor).toFixed(1)) : undefined;
+        const etoValue = etoComparisonByMonthDay[year]?.get(monthDay);
+        row[`year${year}Eto`] = typeof etoValue === "number" ? Number((etoValue * etFactor).toFixed(2)) : undefined;
       });
       return row;
     });
@@ -659,22 +714,89 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         ]
       : [];
 
-  const legendItems: Array<{ label: string; color: string; dashed?: boolean }> = [];
+  const legendItems: Array<{ label: string; color: string; dashed?: boolean; source?: string }> = [];
   if (view === "gdd") {
-    if (show.currentSeason) legendItems.push({ label: "Current Season", color: "#061827" });
-    if (show.projection) legendItems.push({ label: "Projected", color: "#061827", dashed: true });
-    if (show.fiveYearNormal) legendItems.push({ label: "5-yr Average", color: "#934936", dashed: true });
-    if (show.selectedYears) selectedComparisonYears.forEach((year, index) => legendItems.push({ label: `${year}`, color: comparisonYearColor(index) }));
-    if (show.stages) legendItems.push({ label: "Stage", color: "#4a7c59", dashed: true });
+    if (show.currentSeason)
+      legendItems.push({
+        label: "Current Season",
+        color: "#061827",
+        source:
+          "Growing degree days accumulated from gridMET daily min/max air temperature, using the averaging method capped at the crop's base and upper thresholds.",
+      });
+    if (show.projection)
+      legendItems.push({
+        label: "Projected",
+        color: "#061827",
+        dashed: true,
+        source: "Remaining-season GDD projected by extending today's total along the 5-year average daily accumulation rate.",
+      });
+    if (show.fiveYearNormal)
+      legendItems.push({
+        label: "5-yr Average",
+        color: "#934936",
+        dashed: true,
+        source: "Average cumulative GDD on each calendar day across the previous five seasons of gridMET temperatures.",
+      });
+    if (show.selectedYears)
+      selectedComparisonYears.forEach((year, index) =>
+        legendItems.push({
+          label: `${year}`,
+          color: comparisonYearColor(index),
+          source: `Cumulative GDD for the ${year} season from gridMET historical temperatures.`,
+        }),
+      );
+    if (show.stages)
+      legendItems.push({
+        label: "Stage",
+        color: "#4a7c59",
+        dashed: true,
+        source: "Growth-stage GDD thresholds from the selected crop's phenology profile.",
+      });
   } else if (view === "chill") {
     legendItems.push({ label: "Current Chill", color: "#061827" });
     if (chillRequirement) legendItems.push({ label: "Chill Target", color: "#4a7c59", dashed: true });
   } else {
-    if (show.etCumulative) legendItems.push({ label: "Crop ET (cumulative)", color: "#061827" });
-    if (show.referenceEt) legendItems.push({ label: "Reference ETo", color: "#934936", dashed: true });
+    if (show.etCumulative)
+      legendItems.push({
+        label: "Crop ET (cumulative)",
+        color: "#061827",
+        source:
+          "Cumulative crop ET (ETc): OpenET satellite actual ET when available, otherwise reference ETo \u00d7 the crop coefficient (Kc) for the current growth stage.",
+      });
+    if (show.referenceEt)
+      legendItems.push({
+        label: "Reference ETo (this year)",
+        color: "#934936",
+        dashed: true,
+        source: "Cumulative grass-reference ET (ETo) \u2014 atmospheric demand \u2014 for the current season from gridMET history and the Climate Toolbox forecast.",
+      });
+    if (show.etReferencePriorYear)
+      selectedComparisonYears.forEach((year, index) =>
+        legendItems.push({
+          label: `Reference ETo (${year})`,
+          color: etoComparisonYearColor(index),
+          source: `Cumulative grass-reference ET (ETo) for the ${year} season from gridMET history \u2014 a same-field, year-over-year atmospheric-demand comparison, aligned to this season by calendar day.`,
+        }),
+      );
+    if (show.etReferenceNormal)
+      legendItems.push({
+        label: "Reference ETo (5-yr avg)",
+        color: ETO_NORMAL_COLOR,
+        dashed: true,
+        source: "Average cumulative grass-reference ET (ETo) on each calendar day across the previous five seasons of gridMET history \u2014 the \u201cnormal\u201d atmospheric demand for this field.",
+      });
     if (show.etDailyBars) {
-      legendItems.push({ label: "Daily ET", color: "#4a7c59" });
-      if (forecastVisible) legendItems.push({ label: "Daily ET (forecast)", color: "#d29b4e" });
+      legendItems.push({
+        label: "Daily ET",
+        color: "#4a7c59",
+        source: "Daily crop ET (ETc) from gridMET-based history (OpenET actual ET, or ETo \u00d7 Kc).",
+      });
+      if (forecastVisible)
+        legendItems.push({
+          label: "Daily ET (forecast)",
+          color: "#d29b4e",
+          source: "Daily crop ET projected from the Climate Toolbox CFS forecast.",
+        });
     }
   }
 
@@ -686,10 +808,10 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
 
   const viewSubtitle =
     view === "gdd"
-      ? `${cropMetrics.displayName} cumulative GDD across ${currentYear}, with last year and the 5-yr average`
+      ? `${cropDisplayName} cumulative GDD across ${currentYear}, with last year and the 5-yr average`
       : view === "chill"
-        ? `${cropMetrics.displayName} cumulative chill hours this dormant season`
-        : `${cropMetrics.displayName} crop water demand (ET) for the season, with reference ETo`;
+        ? `${cropDisplayName} cumulative chill hours this dormant season`
+        : `${cropDisplayName} crop water demand (ET) for the season, with reference ETo and prior-year comparison`;
 
   const metricCards =
     view === "gdd"
@@ -792,7 +914,6 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
           </div>
           <p>
             {field.name} - {field.cropLabel}
-            {typeof field.areaAcres === "number" ? ` - ${field.areaAcres} ac` : ""}
           </p>
           {dataWarning ? <p className="data-warning">{dataWarning}</p> : null}
         </div>
@@ -853,26 +974,17 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                           dailyEtHistorical: "Daily ET",
                           dailyEtForecast: "Daily ET (forecast)",
                           cumulativeEt: "Crop ET",
-                          cumulativeEto: "Reference ETo",
+                          cumulativeEto: "Reference ETo (this year)",
+                          etoNormal: "Reference ETo (5-yr avg)",
                         };
+                        selectedComparisonYears.forEach((year) => {
+                          labels[`year${year}Eto`] = `Reference ETo (${year})`;
+                        });
                         if (name === "petLow" || name === "petBand") return ["", ""] as [string, string];
                         return [`${Number(value).toFixed(2)} ${etLabel}`, labels[String(name)] ?? String(name)];
                       }}
                       labelFormatter={(label) => etChartData.find((point) => point.date === label)?.fullDate ?? label}
                     />
-                    {etForecastRegionVisible ? (
-                      <ReferenceArea
-                        yAxisId="cumulative"
-                        x1={etForecastStartLabel}
-                        x2={etForecastEndLabel}
-                        fill="#d29b4e"
-                        fillOpacity={0.1}
-                        stroke="#d29b4e"
-                        strokeOpacity={0.25}
-                        ifOverflow="extendDomain"
-                        label={{ value: "Forecast", position: "insideTopRight", fontSize: 11, fontWeight: 800, fill: "#a9762f", dy: 6, dx: -6 }}
-                      />
-                    ) : null}
                     {show.forecastBand ? (
                       <>
                         <Area yAxisId="daily" type="monotone" dataKey="petLow" stackId="pet" stroke="none" fill="none" />
@@ -885,6 +997,24 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                         <Bar yAxisId="daily" dataKey="dailyEtForecast" fill="#d29b4e" fillOpacity={0.92} barSize={6} />
                       </>
                     ) : null}
+                    {show.etReferenceNormal ? (
+                      <Line yAxisId="cumulative" type="monotone" dataKey="etoNormal" stroke={ETO_NORMAL_COLOR} strokeDasharray="5 4" dot={false} strokeWidth={1.8} strokeOpacity={0.85} connectNulls />
+                    ) : null}
+                    {show.etReferencePriorYear
+                      ? selectedComparisonYears.map((year, index) => (
+                          <Line
+                            key={`eto-${year}`}
+                            yAxisId="cumulative"
+                            type="monotone"
+                            dataKey={`year${year}Eto`}
+                            stroke={etoComparisonYearColor(index)}
+                            dot={false}
+                            strokeWidth={1.6}
+                            strokeOpacity={0.82}
+                            connectNulls
+                          />
+                        ))
+                      : null}
                     {show.referenceEt ? (
                       <Line yAxisId="cumulative" type="monotone" dataKey="cumulativeEto" stroke="#934936" strokeDasharray="6 5" dot={false} strokeWidth={2} />
                     ) : null}
@@ -1002,7 +1132,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                 </div>
               </div>
             ) : null}
-            {chartReady && overlaysLoading && view === "gdd" ? <div className="chart-overlay-hint">Loading comparison overlays…</div> : null}
+            {chartReady && overlaysLoading && (view === "gdd" || view === "et") ? <div className="chart-overlay-hint">Loading comparison overlays…</div> : null}
             {!weatherLoading && !chartData.length ? <div className="chart-empty">No weather records loaded for this field and date range.</div> : null}
           </div>
 
@@ -1011,6 +1141,12 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
               <span key={item.label} className="legend-item">
                 <span className="legend-swatch" style={{ borderTopColor: item.color, borderTopStyle: item.dashed ? "dashed" : "solid" }} />
                 {item.label}
+                {item.source ? (
+                  <span className="legend-info" tabIndex={0} aria-label={item.source}>
+                    <Info size={13} />
+                    <span className="legend-info-tooltip">{item.source}</span>
+                  </span>
+                ) : null}
               </span>
             ))}
           </div>
@@ -1022,11 +1158,14 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
               <div>
                 <h2>Growth Stage Timeline</h2>
                 <p>
-                  Dates each {cropMetrics.displayName.toLowerCase()} stage was reached or is projected this season
+                  Dates each {cropDisplayName.toLowerCase()} stage was reached or is projected this season
                   {priorYearForTimeline ? `, with ${priorYearForTimeline} alongside for comparison` : ""}.
                 </p>
               </div>
             </div>
+            {stageProjections.length === 0 ? (
+              <p className="stage-timeline-empty">No growth stages defined for this crop. Add stage thresholds in the field setup to project stage dates.</p>
+            ) : (
             <table className="stage-timeline-table">
               <thead>
                 <tr>
@@ -1072,6 +1211,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                 })}
               </tbody>
             </table>
+            )}
             <p className="stage-timeline-footnote">
               Projected dates use the 28-day forecast, then extend along the average accumulation of the past five seasons. Prior-year dates apply the same
               thresholds and biofix month-day to that year's weather.

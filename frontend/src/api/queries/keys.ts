@@ -13,7 +13,7 @@ export const weatherKeys = {
     ["weather", "season", { lat: round6(lat), lon: round6(lon), startDate, endDate }] as const,
   chill: (lat: number, lon: number, startDate: string, endDate: string) =>
     ["weather", "chill", { lat: round6(lat), lon: round6(lon), startDate, endDate }] as const,
-  year: (lat: number, lon: number, year: number, profile: "full" | "temperature") =>
+  year: (lat: number, lon: number, year: number, profile: "full" | "temperature" | "temperature_et") =>
     ["weather", "year", { lat: round6(lat), lon: round6(lon), year, profile }] as const,
 };
 

@@ -12,6 +12,7 @@ export function buildAnalyticsSnapshot(
 ): AnalyticsSnapshot {
   let cumulativeGddValue = 0;
   let cumulativeEtcMm = 0;
+  let cumulativeEtoMmValue = 0;
   const startDate = field.stageStartDate;
   const weatherWindow = startDate ? weather.filter((record) => record.date >= startDate) : weather;
   const effectiveCrop = {
@@ -27,6 +28,7 @@ export function buildAnalyticsSnapshot(
     const kc = interpolateKc(effectiveCrop, seasonProgressFromGdd(effectiveCrop, cumulativeGddValue));
     const etcMm = Number((record.etActualMm ?? record.etoMm * kc).toFixed(1));
     cumulativeEtcMm += etcMm;
+    cumulativeEtoMmValue += record.etoMm;
 
     return {
       date: record.date,
@@ -35,6 +37,7 @@ export function buildAnalyticsSnapshot(
       kc,
       etcMm,
       cumulativeEtcMm: Number(cumulativeEtcMm.toFixed(1)),
+      cumulativeEtoMm: Number(cumulativeEtoMmValue.toFixed(1)),
       vpdKpa: dailyMeanVpd(record),
     };
   });

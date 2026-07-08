@@ -13,6 +13,8 @@ export interface GraphSeriesVisibility {
   forecast: boolean;
   projection: boolean;
   referenceEt: boolean;
+  etReferencePriorYear: boolean;
+  etReferenceNormal: boolean;
   etCumulative: boolean;
   etDailyBars: boolean;
   forecastBand: boolean;
@@ -59,7 +61,7 @@ export function buildDefaultGraphSettings(input: GraphSettingsDefaultsInput): Gr
     gddUpperTempC: input.gddUpperTempC,
     chillThresholdMinC: input.chillThresholdMinC,
     chillThresholdMaxC: input.chillThresholdMaxC,
-    etUnit: "mm",
+    etUnit: "in",
     yAxisMax: null,
     unitSystem: input.unitSystem,
     show: {
@@ -71,6 +73,8 @@ export function buildDefaultGraphSettings(input: GraphSettingsDefaultsInput): Gr
       forecast: true,
       projection: true,
       referenceEt: true,
+      etReferencePriorYear: true,
+      etReferenceNormal: true,
       etCumulative: true,
       etDailyBars: true,
       forecastBand: true,

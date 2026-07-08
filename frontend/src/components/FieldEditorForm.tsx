@@ -16,32 +16,18 @@ interface FieldFieldsProps {
   onChange: (next: FieldConfig) => void;
 }
 
-// Field name + acreage. Pulled out so the analytics sidebar and the setup page
-// can frame it differently (its own "General Information" card on setup).
+// Field name. Pulled out so the analytics sidebar and the setup page can frame
+// it differently (its own "General Information" card on setup).
 export function GeneralInfoFields({ draft, onChange }: FieldFieldsProps) {
   function patch(next: Partial<FieldConfig>) {
     onChange({ ...draft, ...next });
   }
 
   return (
-    <div className="parameter-grid parameter-grid-pair">
+    <div className="parameter-grid">
       <label>
         <span>Field name</span>
         <input value={draft.name} onChange={(event) => patch({ name: event.target.value })} placeholder="e.g. West Orchard Sector 4" />
-      </label>
-      <label>
-        <span>Acreage</span>
-        <input
-          type="number"
-          min="0"
-          step="0.1"
-          value={draft.areaAcres ?? ""}
-          onChange={(event) => {
-            const value = Number(event.target.value);
-            patch({ areaAcres: event.target.value === "" || !Number.isFinite(value) ? undefined : value });
-          }}
-          placeholder="Acres"
-        />
       </label>
     </div>
   );
@@ -49,6 +35,7 @@ export function GeneralInfoFields({ draft, onChange }: FieldFieldsProps) {
 
 // Crop picker. Switching crops swaps the GDD model + stage list, so reset those
 // controls to the new crop's defaults rather than carrying over mismatched values.
+// Selecting "Other" exposes a free-text crop name the user supplies themselves.
 export function CropField({ draft, onChange }: FieldFieldsProps) {
   function handleCropChange(nextCropId: CropId) {
     if (nextCropId === draft.cropId) return;
@@ -56,14 +43,28 @@ export function CropField({ draft, onChange }: FieldFieldsProps) {
     onChange({
       ...draft,
       cropId: nextCropId,
-      cropLabel: cropOptionLabel(nextCropId),
+      cropLabel: nextCropId === "other" ? "" : cropOptionLabel(nextCropId),
       gddBaseTempC: nextMetrics.gdd.baseTempC,
       gddUpperTempC: nextMetrics.gdd.upperTempC,
       stageThresholds: undefined,
     });
   }
 
-  return <CropSelect value={draft.cropId} onChange={handleCropChange} id="editor-crop-select" />;
+  return (
+    <>
+      <CropSelect value={draft.cropId} onChange={handleCropChange} id="editor-crop-select" />
+      {draft.cropId === "other" ? (
+        <label className="custom-crop-name">
+          <span>Custom crop name</span>
+          <input
+            value={draft.cropLabel}
+            onChange={(event) => onChange({ ...draft, cropLabel: event.target.value })}
+            placeholder="e.g. Sorghum"
+          />
+        </label>
+      ) : null}
+    </>
+  );
 }
 
 // Planting/biofix date + the GDD base/upper temperatures.
@@ -190,7 +191,7 @@ export function StageThresholdsFields({ draft, onChange, heading = true }: Stage
   );
 }
 
-// The non-location attributes of a field (name, crop, acreage, season/GDD model,
+// The non-location attributes of a field (name, crop, season/GDD model,
 // stage thresholds). Location is edited separately, so this form is reused by
 // the analytics sidebar and the field setup page.
 export function FieldEditorForm({ draft, onChange, includeName = true }: FieldEditorFormProps) {
