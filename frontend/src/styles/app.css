@@ -1145,6 +1145,161 @@ dd {
   max-width: 1320px;
 }
 
+/* Home / about-style landing page. Reuses .content + .panel; these rules only
+   add the landing-specific layout on top of the shared framing. */
+.home-content {
+  max-width: 1120px;
+}
+
+.home-tagline {
+  max-width: 720px;
+  font-size: 16px;
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.home-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.home-card h3 {
+  margin: 0;
+  color: #061827;
+}
+
+.home-card p {
+  margin: 0;
+}
+
+.home-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #f3dfd6;
+  color: #934936;
+}
+
+.home-section {
+  padding: 28px;
+  margin-bottom: 24px;
+}
+
+.home-section h2 {
+  color: #061827;
+}
+
+.home-crop-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.home-crop-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1px solid #c4c6cc;
+  border-radius: 999px;
+  background: #f5f3ef;
+  color: #061827;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.home-crop-list li svg {
+  color: #934936;
+}
+
+.home-source-list {
+  margin: 18px 0 0;
+  display: grid;
+  gap: 14px;
+}
+
+.home-source-list div {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) 1fr;
+  gap: 16px;
+  align-items: baseline;
+}
+
+.home-source-list dt {
+  font-family: Geist, ui-monospace, monospace;
+  font-weight: 800;
+  color: #061827;
+}
+
+.home-source-list dd {
+  margin: 0;
+  color: #43474c;
+  line-height: 1.45;
+}
+
+.home-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px 24px;
+  background: #f5f3ef;
+}
+
+.home-note svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #934936;
+}
+
+.home-note p {
+  margin: 0;
+}
+
+.home-cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #934936;
+  font-family: Geist, ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.home-cta-secondary:hover {
+  color: #061827;
+}
+
+@media (max-width: 720px) {
+  .home-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-source-list div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}
+
 .field-list {
   padding: 0;
   overflow: hidden;

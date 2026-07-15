@@ -4,8 +4,18 @@ import { dailyGdd } from "./gdd";
 import { interpolateKc } from "./kc";
 import { dailyMeanVpd } from "./vpd";
 import { cropProfiles } from "../data/crops";
-import { defaultFields } from "../data/fields";
-import type { WeatherRecord } from "../types/domain";
+import type { FieldConfig, WeatherRecord } from "../types/domain";
+
+// A minimal almond field fixture (the app no longer ships a seed field).
+const baseField: FieldConfig = {
+  id: "test-field",
+  name: "Test Field",
+  cropId: cropProfiles.almond.id,
+  cropLabel: cropProfiles.almond.label,
+  lat: 36.7378,
+  lon: -119.7871,
+  stageStartDate: "2024-01-01",
+};
 
 const record: WeatherRecord = {
   date: "2024-03-01",
@@ -33,7 +43,7 @@ describe("Water 3D calculations", () => {
   });
 
   it("builds a crop-aware analytics snapshot", () => {
-    const field = { ...defaultFields[0], stageStartDate: "2024-01-01" };
+    const field = { ...baseField, stageStartDate: "2024-01-01" };
     const snapshot = buildAnalyticsSnapshot(field, cropProfiles.almond, [record], [0]);
     expect(snapshot.currentGdd).toBe(13);
     expect(snapshot.cumulativeEtcMm).toBeGreaterThan(0);
@@ -41,7 +51,7 @@ describe("Water 3D calculations", () => {
   });
 
   it("starts analytics accumulation at the field stage start date", () => {
-    const field = { ...defaultFields[0], stageStartDate: "2024-03-02" };
+    const field = { ...baseField, stageStartDate: "2024-03-02" };
     const snapshot = buildAnalyticsSnapshot(field, cropProfiles.almond, [record], [0]);
     expect(snapshot.records).toHaveLength(0);
     expect(snapshot.currentGdd).toBe(0);
@@ -49,7 +59,7 @@ describe("Water 3D calculations", () => {
 
   it("uses field-specific crop stage thresholds when configured", () => {
     const field = {
-      ...defaultFields[0],
+      ...baseField,
       stageStartDate: "2024-01-01",
       stageThresholds: [
         { label: "Custom dormancy", gdd: 0 },

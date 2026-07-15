@@ -6,6 +6,56 @@ the only server is PocketBase (persistence/auth).
 
 ---
 
+## Summary — APIs at a glance
+
+### gridMET (primary observed history)
+- **URL:** `https://toolbox-webservices.nkn.uidaho.edu/Services/get-netcdf-data/`
+- **Data:** max/min temperature · precipitation · reference ET (grass) · vapor
+  pressure deficit · max/min relative humidity — daily, 1979→present (~2-day lag)
+- **How we use it:** the backbone observed record (Jan 1 → today) behind GDD,
+  ETc, VPD, and stress; also the per-year temps + ETo for comparison/normal overlays.
+
+### Climate Toolbox CFSv2 (forecast)
+- **URL:** `https://climate-dev.nkn.uidaho.edu/Services/get-cfs-data/`
+- **Data:** reference ET · max/min temperature · precipitation · specific
+  humidity · vapor pressure deficit — 28-day, 48-member ensemble
+- **How we use it:** extends the season forward; forecast GDD/ETc, the P10/P90
+  uncertainty band, and projected stage dates.
+
+### Open-Meteo (hourly source)
+- **URL:** `https://archive-api.open-meteo.com/v1/archive`
+- **Data:** daily min/max temp · precipitation · reference ET; hourly
+  temperature · relative humidity · dew point
+- **How we use it:** the *only* source of real hourly temps — drives chill-hour
+  accounting over the dormant season.
+
+### OpenET (satellite ET, opt-in)
+- **URL:** `https://openet-api.org/raster/timeseries/point`
+- **Data:** actual ET · reference ETo · precipitation · ET fraction · NDVI ·
+  model count
+- **How we use it:** when enabled, satellite *actual* ET replaces the modeled
+  `ETo × Kc` estimate day-by-day; token-gated, off by default.
+
+### NRCS Soil Data Access / SSURGO (field setup)
+- **URL:** `https://sdmdataaccess.nrcs.usda.gov/Tabular/post.rest`
+- **Data:** soil texture · hydrologic group · drainage class · component
+  name/percent · available water holding capacity (AWHC)
+- **How we use it:** one-time context at field setup; AWHC and soil attributes
+  are stored on the field (not yet consumed by any calculation).
+
+### Mapbox (location, not measurement)
+- **URL:** `https://api.mapbox.com` (+ `mapbox://` styles)
+- **Data:** satellite map tiles · static satellite images · place/address geocoding
+- **How we use it:** the field-picker map, field thumbnails, and address → lat/lon
+  — the coordinates that key every weather/ET/soil request.
+
+### PocketBase (backend)
+- **URL:** `https://water3d.vistacompute1.ucmerced.edu/pb` (prod)
+- **Data:** user accounts · saved fields · cached OpenET responses
+- **How we use it:** auth and persistence only — not a weather/measurement source.
+
+---
+
 ## 1. The pivot point: `WeatherRecord`
 
 Every weather/ET/soil provider normalizes its response into one shared shape,

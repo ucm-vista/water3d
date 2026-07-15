@@ -6,13 +6,15 @@ import { Dashboard } from "./components/Dashboard";
 import { FieldManager } from "./components/FieldManager";
 import { FieldSidebar } from "./components/FieldSidebar";
 import { Header } from "./components/Header";
+import { Home } from "./components/Home";
 import { loadFields } from "./utils/storage";
 import type { FieldConfig } from "./types/domain";
 
 export function App() {
   const [fields, setFields] = useState<FieldConfig[]>(() => loadFields());
   const [selectedFieldId, setSelectedFieldId] = useState(fields[0]?.id ?? "");
-  const [activeView, setActiveView] = useState("Analytics");
+  // New users (no fields) land on Home; returning users go straight to Analytics.
+  const [activeView, setActiveView] = useState(() => (fields.length ? "Analytics" : "Home"));
   const [authSession, setAuthSession] = useState<AuthSession>(() => getAuthSession());
 
   useEffect(() => {
@@ -97,7 +99,9 @@ export function App() {
         onLogout={handleLogout}
       />
       <div className="body-shell">
-        {activeView === "Analytics" && selectedField ? (
+        {activeView === "Home" ? (
+          <Home hasFields={fields.length > 0} onGetStarted={() => setActiveView("Fields")} />
+        ) : activeView === "Analytics" && selectedField ? (
           <div className="analytics-shell">
             <FieldSidebar
               key={selectedField.id}

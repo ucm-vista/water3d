@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import type { AuthSession } from "../backend/authRepository";
-import { AuthStatus } from "./AuthStatus";
 
 interface HeaderProps {
   activeView: string;
@@ -14,9 +13,11 @@ interface HeaderProps {
 }
 
 export function Header({ activeView, canViewAnalytics, authSession, onViewChange, onLogin, onRegister, onLogout }: HeaderProps) {
-  // Any view that isn't "Analytics" renders the field manager, so the Fields tab
-  // is active whenever Analytics is not.
+  const homeActive = activeView === "Home";
   const analyticsActive = activeView === "Analytics" && canViewAnalytics;
+  // Home and Analytics aside, every remaining view renders the field manager, so
+  // the Fields tab is active whenever neither of those is.
+  const fieldsActive = !homeActive && !analyticsActive;
   // On phones the nav collapses behind a hamburger; picking a destination closes it.
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -27,16 +28,18 @@ export function Header({ activeView, canViewAnalytics, authSession, onViewChange
 
   return (
     <header className="topbar">
-      <button
-        type="button"
-        className="brand brand-button"
-        onClick={() => {
-          if (canViewAnalytics) selectView("Analytics");
-        }}
-      >
+      <button type="button" className="brand brand-button" onClick={() => selectView("Home")}>
         Water 3D
       </button>
       <nav id="primary-nav" className={`main-nav${menuOpen ? " nav-open" : ""}`} aria-label="Primary">
+        <button
+          type="button"
+          className={homeActive ? "nav-active" : ""}
+          aria-current={homeActive ? "page" : undefined}
+          onClick={() => selectView("Home")}
+        >
+          Home
+        </button>
         <button
           type="button"
           className={analyticsActive ? "nav-active" : ""}
@@ -48,8 +51,8 @@ export function Header({ activeView, canViewAnalytics, authSession, onViewChange
         </button>
         <button
           type="button"
-          className={!analyticsActive ? "nav-active" : ""}
-          aria-current={!analyticsActive ? "page" : undefined}
+          className={fieldsActive ? "nav-active" : ""}
+          aria-current={fieldsActive ? "page" : undefined}
           onClick={() => selectView("Fields")}
         >
           Fields
@@ -66,7 +69,7 @@ export function Header({ activeView, canViewAnalytics, authSession, onViewChange
         >
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
-        <AuthStatus session={authSession} onLogin={onLogin} onRegister={onRegister} onLogout={onLogout} />
+        {/* Account button temporarily removed — auth wiring below stays in place for easy restore. */}
       </div>
     </header>
   );
