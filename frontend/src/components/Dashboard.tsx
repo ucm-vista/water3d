@@ -33,8 +33,8 @@ import {
 } from "../utils/units";
 import { MetricCard } from "./MetricCard";
 import { AdvancedGraphSettings } from "./AdvancedGraphSettings";
-import { InlineMetricControls, type MetricView } from "./InlineMetricControls";
-import { TomatoLoader } from "./TomatoLoader";
+import { InlineMetricControls, type GddChartMode, type MetricView } from "./InlineMetricControls";
+import { ChartLoader } from "./ChartLoader";
 import { buildDefaultGraphSettings, FORECAST_RANGE_OPTIONS, type GraphSettings } from "./graphSettings";
 
 // The forecast fetch always pulls the widest selectable window; the UI then
@@ -247,6 +247,9 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   const [settings, setSettings] = useState<GraphSettings>(defaultSettings);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [view, setView] = useState<MetricView>("gdd");
+  // GDD view can render either the cumulative curve or daily-accumulation bars
+  // (the reviewer asked for a bar option alongside the cumulative chart).
+  const [gddChartMode, setGddChartMode] = useState<GddChartMode>("cumulative");
 
   const selectedStartDate = settings.startDate;
   const forecastDays = settings.forecastDays;
@@ -353,6 +356,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
     setSettings(defaultSettings);
     setAdvancedOpen(false);
     setView("gdd");
+    setGddChartMode("cumulative");
   }, [defaultSettings]);
 
   useEffect(() => {
@@ -509,14 +513,18 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
     return map;
   }, [snapshot.records, actualEndDate]);
 
+  // Hard-capped at the forecast horizon (never year-end): the current-season
+  // projection only fills any gap between the loaded data and today+forecastDays
+  // using the 5-yr-average daily rate. The full-year normal/comparison curves stay
+  // as climatological context, but this season's line does not run to Dec 31.
   const projectedByDate = useMemo(() => {
     const map = new Map<string, number>();
     const cutoff = snapshot.records.filter((record) => record.date <= actualEndDate).at(-1);
-    if (!show.projection || !cutoff || !normalDailyGddByMonthDay.size || cutoff.date >= yearEndDate) return map;
+    if (!show.projection || !cutoff || !normalDailyGddByMonthDay.size || cutoff.date >= forecastHorizonDate) return map;
     let cumulative = cutoff.cumulativeGdd;
     map.set(cutoff.date, cumulative);
     let cursor = new Date(`${cutoff.date}T00:00:00Z`);
-    const end = new Date(`${yearEndDate}T00:00:00Z`);
+    const end = new Date(`${forecastHorizonDate}T00:00:00Z`);
     while (cursor < end) {
       cursor = addUtcDays(cursor, 1);
       const iso = toIsoDate(cursor);
@@ -524,7 +532,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
       map.set(iso, cumulative);
     }
     return map;
-  }, [snapshot.records, actualEndDate, show.projection, normalDailyGddByMonthDay, yearEndDate]);
+  }, [snapshot.records, actualEndDate, show.projection, normalDailyGddByMonthDay, forecastHorizonDate]);
 
   const gddChartData = useMemo(
     () =>
@@ -549,8 +557,31 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
     [comparisonByMonthDay, currentByDate, fullYearDates, normalCumulativeByMonthDay, projectedByDate, selectedComparisonYears, unitFactor],
   );
 
-  // ---- ET chart (crop water demand, biofix -> forecast horizon) ----
+  // ---- Daily GDD bars (biofix -> forecast horizon) ----
+  // Same date window as the cumulative "current" line, but each point carries the
+  // *daily* GDD so it can render as a histogram. Historical vs forecast days are
+  // split into separate keys so they can be colored distinctly.
   const weatherByDate = useMemo(() => new Map(weatherRecords.map((record) => [record.date, record])), [weatherRecords]);
+  const gddDailyChartData = useMemo(
+    () =>
+      snapshot.records
+        .filter((record) => record.date <= actualEndDate)
+        .map((record) => {
+          const isForecast = weatherByDate.get(record.date)?.source === "forecast";
+          const daily = Number((record.gdd * unitFactor).toFixed(1));
+          const normalDaily = normalDailyGddByMonthDay.get(record.date.slice(5));
+          return {
+            date: formatDateLabel(record.date),
+            fullDate: record.date,
+            dailyGddHistorical: isForecast ? undefined : daily,
+            dailyGddForecast: isForecast ? daily : undefined,
+            normalDaily: typeof normalDaily === "number" ? Number((normalDaily * unitFactor).toFixed(1)) : undefined,
+          };
+        }),
+    [snapshot.records, actualEndDate, weatherByDate, unitFactor, normalDailyGddByMonthDay],
+  );
+
+  // ---- ET chart (crop water demand, biofix -> forecast horizon) ----
   const etChartData = useMemo(() => {
     let cumulativeEto = 0;
     return snapshot.records.filter((record) => record.date <= actualEndDate).map((record) => {
@@ -590,7 +621,8 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   const forecastEtcMm = forecastEndEtc - observedEtc;
 
   // ---- Active chart selection ----
-  const chartData = view === "et" ? etChartData : view === "chill" ? chillSeriesData(chillSeries) : gddChartData;
+  const gddView = view === "gdd" && gddChartMode === "daily" ? gddDailyChartData : gddChartData;
+  const chartData = view === "et" ? etChartData : view === "chill" ? chillSeriesData(chillSeries) : gddView;
 
   function chillSeriesData(series: ReturnType<typeof cumulativeChillHours>) {
     return series.map((record) => ({
@@ -715,7 +747,26 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
       : [];
 
   const legendItems: Array<{ label: string; color: string; dashed?: boolean; source?: string }> = [];
-  if (view === "gdd") {
+  if (view === "gdd" && gddChartMode === "daily") {
+    legendItems.push({
+      label: "Daily GDD",
+      color: "#061827",
+      source: "Growing degree days accumulated each day from gridMET daily min/max air temperature.",
+    });
+    if (forecastVisible)
+      legendItems.push({
+        label: "Daily GDD (forecast)",
+        color: "#d29b4e",
+        source: "Daily GDD projected from the Climate Toolbox CFS forecast across the selected window.",
+      });
+    if (show.fiveYearNormal)
+      legendItems.push({
+        label: "5-yr Avg (daily)",
+        color: "#934936",
+        dashed: true,
+        source: "Average daily GDD on each calendar day across the previous five seasons of gridMET temperatures.",
+      });
+  } else if (view === "gdd") {
     if (show.currentSeason)
       legendItems.push({
         label: "Current Season",
@@ -728,7 +779,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         label: "Projected",
         color: "#061827",
         dashed: true,
-        source: "Remaining-season GDD projected by extending today's total along the 5-year average daily accumulation rate.",
+        source: "GDD projected to the end of the forecast window (capped at the selected forecast range) using the 5-year average daily accumulation rate.",
       });
     if (show.fiveYearNormal)
       legendItems.push({
@@ -808,7 +859,9 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
 
   const viewSubtitle =
     view === "gdd"
-      ? `${cropDisplayName} cumulative GDD across ${currentYear}, with last year and the 5-yr average`
+      ? gddChartMode === "daily"
+        ? `${cropDisplayName} daily GDD accumulation this season, with the 5-yr average`
+        : `${cropDisplayName} cumulative GDD across ${currentYear}, with last year and the 5-yr average`
       : view === "chill"
         ? `${cropDisplayName} cumulative chill hours this dormant season`
         : `${cropDisplayName} crop water demand (ET) for the season, with reference ETo and prior-year comparison`;
@@ -956,6 +1009,8 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
             settings={settings}
             onChange={setSettings}
             chillRequirement={chillRequirement}
+            gddChartMode={gddChartMode}
+            onGddChartModeChange={setGddChartMode}
             onOpenAdvanced={() => setAdvancedOpen(true)}
           />
 
@@ -1031,6 +1086,46 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                         strokeWidth={1.5}
                       />
                     ) : null}
+                  </ComposedChart>
+                ) : view === "gdd" && gddChartMode === "daily" ? (
+                  <ComposedChart data={gddDailyChartData} margin={{ top: 28, right: 24, bottom: 16, left: 12 }}>
+                    <XAxis dataKey="date" tickLine={false} axisLine={false} minTickGap={24} tick={{ fontSize: 11 }} height={42} />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      width={58}
+                      tickMargin={8}
+                      tick={{ fontSize: 12 }}
+                      label={{
+                        value: `Daily ${unitLabel}`,
+                        angle: -90,
+                        position: "insideLeft",
+                        offset: 2,
+                        dy: 40,
+                        fill: "#687078",
+                        fontSize: 12,
+                        fontWeight: 800,
+                      }}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "rgba(74, 124, 89, 0.18)" }}
+                      contentStyle={{ background: "#ffffff", border: "1px solid #9fa89d", borderRadius: 3, color: "#061827", fontWeight: 800 }}
+                      formatter={(value, name) => {
+                        const labels: Record<string, string> = {
+                          dailyGddHistorical: "Daily GDD",
+                          dailyGddForecast: "Daily GDD (forecast)",
+                          normalDaily: "5-yr Avg (daily)",
+                        };
+                        return [`${Number(value).toFixed(1)} ${unitLabel}`, labels[String(name)] ?? String(name)];
+                      }}
+                      labelFormatter={(label) => gddDailyChartData.find((point) => point.date === label)?.fullDate ?? label}
+                    />
+                    <Bar dataKey="dailyGddHistorical" fill="#061827" barSize={4} />
+                    {forecastVisible ? <Bar dataKey="dailyGddForecast" fill="#d29b4e" barSize={4} /> : null}
+                    {show.fiveYearNormal ? (
+                      <Line type="monotone" dataKey="normalDaily" stroke="#934936" strokeDasharray="6 5" dot={false} strokeWidth={2} strokeOpacity={0.9} connectNulls />
+                    ) : null}
+                    <ReferenceLine x={todayLabel} stroke="#687078" strokeDasharray="2 4" strokeOpacity={0.7} />
                   </ComposedChart>
                 ) : (
                   <ComposedChart data={chartData} margin={{ top: 28, right: 178, bottom: 16, left: 12 }}>
@@ -1123,15 +1218,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                 )}
               </ResponsiveContainer>
             ) : null}
-            {weatherLoading ? (
-              <div className="chart-loading-overlay" role="status" aria-live="polite">
-                <div className="chart-skeleton" aria-hidden="true" />
-                <div className="chart-loader-stack">
-                  <TomatoLoader size={200} label="Loading crop metrics" />
-                  <span className="chart-loading-label">Loading crop metrics…</span>
-                </div>
-              </div>
-            ) : null}
+            <ChartLoader active={weatherLoading} label="Loading crop metrics" />
             {chartReady && overlaysLoading && (view === "gdd" || view === "et") ? <div className="chart-overlay-hint">Loading comparison overlays…</div> : null}
             {!weatherLoading && !chartData.length ? <div className="chart-empty">No weather records loaded for this field and date range.</div> : null}
           </div>

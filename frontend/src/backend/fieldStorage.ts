@@ -7,6 +7,12 @@ import { isPocketBaseEnabled } from "./pocketbaseClient";
 
 const STORAGE_KEY = "water3d.fields.v1";
 
+// v1 decision (see PLAN.md W5): keep field storage in the browser only. The auth
+// code (login/signup) stays wired up and intact, but fields are never read from or
+// written to PocketBase yet. Flip this to `false` to re-enable account-backed sync
+// once the account/migration flow is finalized.
+const BROWSER_STORAGE_ONLY = true;
+
 export interface FieldStorageState {
   fields: FieldConfig[];
   source: "pocketbase" | "local";
@@ -35,7 +41,7 @@ export function saveLocalFields(fields: FieldConfig[]): void {
 }
 
 export async function loadFieldStorage(): Promise<FieldStorageState> {
-  if (!isPocketBaseEnabled() || !getAuthSession().isAuthenticated) {
+  if (BROWSER_STORAGE_ONLY || !isPocketBaseEnabled() || !getAuthSession().isAuthenticated) {
     const fields = loadLocalFields();
     debugDataSource("pocketbase", "field load using local storage", {
       enabled: isPocketBaseEnabled(),
@@ -73,7 +79,7 @@ export async function loadFieldStorage(): Promise<FieldStorageState> {
 export async function saveFieldStorage(fields: FieldConfig[], changedField?: FieldConfig): Promise<FieldStorageState> {
   saveLocalFields(fields);
 
-  if (!isPocketBaseEnabled() || !getAuthSession().isAuthenticated || !changedField) {
+  if (BROWSER_STORAGE_ONLY || !isPocketBaseEnabled() || !getAuthSession().isAuthenticated || !changedField) {
     debugDataSource("pocketbase", "field save using local storage", {
       enabled: isPocketBaseEnabled(),
       authenticated: getAuthSession().isAuthenticated,

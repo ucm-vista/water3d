@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { Menu, X } from "lucide-react";
 import type { AuthSession } from "../backend/authRepository";
 import { AuthStatus } from "./AuthStatus";
 
@@ -15,23 +17,32 @@ export function Header({ activeView, canViewAnalytics, authSession, onViewChange
   // Any view that isn't "Analytics" renders the field manager, so the Fields tab
   // is active whenever Analytics is not.
   const analyticsActive = activeView === "Analytics" && canViewAnalytics;
+  // On phones the nav collapses behind a hamburger; picking a destination closes it.
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  function selectView(view: string) {
+    onViewChange(view);
+    setMenuOpen(false);
+  }
 
   return (
     <header className="topbar">
       <button
         type="button"
         className="brand brand-button"
-        onClick={() => canViewAnalytics && onViewChange("Analytics")}
+        onClick={() => {
+          if (canViewAnalytics) selectView("Analytics");
+        }}
       >
         Water 3D
       </button>
-      <nav className="main-nav" aria-label="Primary">
+      <nav id="primary-nav" className={`main-nav${menuOpen ? " nav-open" : ""}`} aria-label="Primary">
         <button
           type="button"
           className={analyticsActive ? "nav-active" : ""}
           aria-current={analyticsActive ? "page" : undefined}
           disabled={!canViewAnalytics}
-          onClick={() => onViewChange("Analytics")}
+          onClick={() => selectView("Analytics")}
         >
           Analytics
         </button>
@@ -39,12 +50,22 @@ export function Header({ activeView, canViewAnalytics, authSession, onViewChange
           type="button"
           className={!analyticsActive ? "nav-active" : ""}
           aria-current={!analyticsActive ? "page" : undefined}
-          onClick={() => onViewChange("Fields")}
+          onClick={() => selectView("Fields")}
         >
           Fields
         </button>
       </nav>
       <div className="header-actions">
+        <button
+          type="button"
+          className="nav-toggle"
+          aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+          aria-expanded={menuOpen}
+          aria-controls="primary-nav"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          {menuOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
         <AuthStatus session={authSession} onLogin={onLogin} onRegister={onRegister} onLogout={onLogout} />
       </div>
     </header>

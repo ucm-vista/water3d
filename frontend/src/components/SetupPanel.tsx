@@ -4,6 +4,7 @@ import { lazy, Suspense, useState } from "react";
 import { cropOptions } from "../data/crops";
 import { getCropMetricProfile } from "../data/cropMetrics";
 import { mapboxConfig } from "../config/mapbox";
+import { useAutosave } from "../hooks/useAutosave";
 import type { FieldConfig } from "../types/domain";
 import { getCurrentYearStartDate } from "../utils/dateRange";
 import { cropOptionLabel } from "./CropSelect";
@@ -61,6 +62,14 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, onGoHome, f
   const [draft, setDraft] = useState<FieldConfig>(() => field ?? newFieldDraft());
   const [searchValue, setSearchValue] = useState("");
 
+  // When editing an existing field, autosave edits (debounced) instead of
+  // requiring an explicit save. Passing `field ?? draft` as the saved snapshot
+  // makes this a no-op while creating a new field (there is nothing to save
+  // until the field is activated).
+  useAutosave(draft, field ?? draft, (next) => {
+    if (isEditing) onUpdateField?.(next);
+  });
+
   function setLocation(location: { lat: number; lon: number }) {
     setDraft((current) => ({ ...current, lat: location.lat, lon: location.lon }));
   }
@@ -86,7 +95,7 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, onGoHome, f
   const canSubmit = draft.name.trim().length > 0;
   const goBack = onCancel ?? onGoHome;
   const subtitle = isEditing
-    ? "Update this field's location, crop, planting date, GDD model, and growth stages."
+    ? "Update this field's location, crop, planting date, GDD model, and growth stages. Changes save automatically."
     : "Register a field once, then track growing degree days, crop stages, and year-over-year comparisons.";
 
   return (
@@ -101,16 +110,18 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, onGoHome, f
           <h1>{isEditing ? "Edit Field Configuration" : "New Field Configuration"}</h1>
         </div>
         <p className="config-banner-sub">{subtitle}</p>
-        <div className="config-banner-actions">
-          {onCancel ? (
-            <button type="button" className="config-cancel-button" onClick={onCancel}>
-              Cancel
+        {isEditing ? null : (
+          <div className="config-banner-actions">
+            {onCancel ? (
+              <button type="button" className="config-cancel-button" onClick={onCancel}>
+                Cancel
+              </button>
+            ) : null}
+            <button type="button" className="config-save-button" onClick={handleSubmit} disabled={!canSubmit}>
+              Activate Field
             </button>
-          ) : null}
-          <button type="button" className="config-save-button" onClick={handleSubmit} disabled={!canSubmit}>
-            {isEditing ? "Save Field Changes" : "Activate Field"}
-          </button>
-        </div>
+          </div>
+        )}
       </header>
 
       <main className="content config-content">

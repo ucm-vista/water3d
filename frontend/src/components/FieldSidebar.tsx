@@ -2,6 +2,7 @@ import { Check, MapPin, Pencil, Search } from "lucide-react";
 import { SearchBox } from "@mapbox/search-js-react";
 import { lazy, Suspense, useState } from "react";
 import { mapboxConfig } from "../config/mapbox";
+import { useAutosave } from "../hooks/useAutosave";
 import type { FieldConfig } from "../types/domain";
 import { FieldEditorForm } from "./FieldEditorForm";
 import { FieldMapThumbnail } from "./FieldMapThumbnail";
@@ -20,7 +21,8 @@ interface FieldSidebarProps {
 }
 
 // Persistent field-editing panel for the Analytics view. Holds a live working
-// copy of the field (location + the shared FieldEditorForm) and commits on Save.
+// copy of the field (location + the shared FieldEditorForm) and autosaves edits
+// (debounced) as the user changes them — no explicit Save step.
 // Remounted via key={field.id} in App when the selected field changes.
 export function FieldSidebar({ field, fields, onSelectField, onUpdateField }: FieldSidebarProps) {
   const [draft, setDraft] = useState<FieldConfig>(field);
@@ -28,7 +30,7 @@ export function FieldSidebar({ field, fields, onSelectField, onUpdateField }: Fi
   const [isEditingName, setIsEditingName] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  const isDirty = JSON.stringify(draft) !== JSON.stringify(field);
+  useAutosave(draft, field, onUpdateField);
 
   function setLocation(location: { lat: number; lon: number }) {
     setDraft((current) => ({ ...current, lat: location.lat, lon: location.lon }));
@@ -39,11 +41,6 @@ export function FieldSidebar({ field, fields, onSelectField, onUpdateField }: Fi
     if (!coordinates) return;
     const [lon, lat] = coordinates;
     if (Number.isFinite(lat) && Number.isFinite(lon)) setLocation({ lat, lon });
-  }
-
-  function handleCancel() {
-    setDraft(field);
-    setIsEditingLocation(false);
   }
 
   return (
@@ -137,15 +134,6 @@ export function FieldSidebar({ field, fields, onSelectField, onUpdateField }: Fi
         </section>
 
         <FieldEditorForm draft={draft} onChange={setDraft} includeName={false} />
-      </div>
-
-      <div className="sidebar-save-bar">
-        <button type="button" className="secondary-button" onClick={handleCancel} disabled={!isDirty}>
-          Cancel
-        </button>
-        <button type="button" className="sidebar-save-button" onClick={() => onUpdateField(draft)} disabled={!isDirty}>
-          {isDirty ? "Save Changes" : "Saved"}
-        </button>
       </div>
     </aside>
   );

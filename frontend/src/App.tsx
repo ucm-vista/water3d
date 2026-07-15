@@ -14,8 +14,6 @@ export function App() {
   const [selectedFieldId, setSelectedFieldId] = useState(fields[0]?.id ?? "");
   const [activeView, setActiveView] = useState("Analytics");
   const [authSession, setAuthSession] = useState<AuthSession>(() => getAuthSession());
-  const [storageStatus, setStorageStatus] = useState("Local storage");
-  const [storageWarning, setStorageWarning] = useState<string | null>(null);
 
   useEffect(() => {
     return onAuthChange((session) => {
@@ -34,8 +32,6 @@ export function App() {
 
       setFields(state.fields);
       setSelectedFieldId((current) => (state.fields.some((field) => field.id === current) ? current : state.fields[0]?.id ?? ""));
-      setStorageStatus(state.source === "pocketbase" ? "PocketBase storage" : "Local storage");
-      setStorageWarning(state.warning ?? null);
     }
 
     void hydrateFields();
@@ -54,8 +50,6 @@ export function App() {
     setFields(nextFields);
     const state = await saveFieldStorage(nextFields, changedField);
     setFields(state.fields);
-    setStorageStatus(state.source === "pocketbase" ? "PocketBase storage" : "Local storage");
-    setStorageWarning(state.warning ?? null);
   }
 
   function handleSelectField(fieldId: string) {
@@ -89,8 +83,6 @@ export function App() {
   function handleLogout() {
     logout();
     setAuthSession(getAuthSession());
-    setStorageStatus("Local storage");
-    setStorageWarning(null);
   }
 
   return (
@@ -126,11 +118,6 @@ export function App() {
           />
         )}
       </div>
-      <footer className="footer">
-        <strong>Water 3D</strong>
-        <span>Hydrological Precision - Analytics v0.1</span>
-        <span>{storageWarning ?? storageStatus}</span>
-      </footer>
     </div>
   );
 }

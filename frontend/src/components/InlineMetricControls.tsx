@@ -2,12 +2,15 @@ import { SlidersHorizontal } from "lucide-react";
 import type { GraphSettings } from "./graphSettings";
 
 export type MetricView = "gdd" | "chill" | "et";
+export type GddChartMode = "cumulative" | "daily";
 
 interface InlineMetricControlsProps {
   view: MetricView;
   settings: GraphSettings;
   onChange: (next: GraphSettings) => void;
   chillRequirement?: number;
+  gddChartMode: GddChartMode;
+  onGddChartModeChange: (mode: GddChartMode) => void;
   onOpenAdvanced: () => void;
 }
 
@@ -15,7 +18,15 @@ interface InlineMetricControlsProps {
 // essentials for the active metric and writes straight through to live
 // settings, so the chart updates in real time. Everything else lives behind the
 // Advanced button.
-export function InlineMetricControls({ view, settings, onChange, chillRequirement, onOpenAdvanced }: InlineMetricControlsProps) {
+export function InlineMetricControls({
+  view,
+  settings,
+  onChange,
+  chillRequirement,
+  gddChartMode,
+  onGddChartModeChange,
+  onOpenAdvanced,
+}: InlineMetricControlsProps) {
   function patch(next: Partial<GraphSettings>) {
     onChange({ ...settings, ...next });
   }
@@ -24,6 +35,17 @@ export function InlineMetricControls({ view, settings, onChange, chillRequiremen
     <div className="inline-controls">
       <div className="inline-controls-fields">
         {view === "gdd" ? <UnitToggle settings={settings} onChange={onChange} /> : null}
+
+        {view === "gdd" ? (
+          <div className="inline-segmented" role="group" aria-label="GDD chart type">
+            <button type="button" className={gddChartMode === "cumulative" ? "selected" : ""} onClick={() => onGddChartModeChange("cumulative")}>
+              Cumulative
+            </button>
+            <button type="button" className={gddChartMode === "daily" ? "selected" : ""} onClick={() => onGddChartModeChange("daily")}>
+              Daily
+            </button>
+          </div>
+        ) : null}
 
         {view === "chill" ? (
           <>

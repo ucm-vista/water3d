@@ -23,17 +23,12 @@ export function FieldManager({ fields, selectedFieldId, onSelectField, onCreateF
     setIsAddingField(false);
   }
 
-  function handleUpdateField(field: FieldConfig) {
-    onUpdateField(field);
-    setEditingFieldId(null);
-  }
-
   if (editingField) {
     return (
       <SetupPanel
         field={editingField}
         onCreateField={onCreateField}
-        onUpdateField={handleUpdateField}
+        onUpdateField={onUpdateField}
         onCancel={() => setEditingFieldId(null)}
         onGoHome={() => onSelectField(editingField.id)}
       />

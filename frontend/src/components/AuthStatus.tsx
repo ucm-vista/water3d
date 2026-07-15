@@ -73,7 +73,7 @@ export function AuthStatus({ session, onLogin, onRegister, onLogout }: AuthStatu
           <div className="account-menu-status">
             <span className="account-menu-eyebrow">Account</span>
             <strong>{session.isAuthenticated ? session.email ?? "Signed in" : "Guest mode"}</strong>
-            <span>{session.isAuthenticated ? "PocketBase storage" : "Local storage session only"}</span>
+            <span>{session.isAuthenticated ? "Signed in · fields saved in this browser" : "Local storage session only"}</span>
           </div>
 
           {session.isAuthenticated ? (
