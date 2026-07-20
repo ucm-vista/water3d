@@ -8,10 +8,13 @@
 #   web          nginx serving the static SPA bundle (baked at build time).
 #   pocketbase   auth + owner-scoped field storage, routed under /pb.
 #
-# Setup:
+# Setup (standalone box — this stack owns ports 80/443):
 #   cp ../frontend/.env.production.example ../frontend/.env.production   # set VITE_POCKETBASE_URL + Mapbox token
 #   #  drop the wildcard cert into deploy/certs/ (vistacompute1.crt + vistacompute1.key)
-#   docker compose up -d --build
+#   docker compose --profile standalone up -d --build
+#
+# Setup (vistacompute1 — shared edge Traefik already owns 80/443):
+#   docker compose -f docker-compose.yml -f docker-compose.vistacompute1.yml up -d --build
 #   docker compose exec pocketbase /usr/local/bin/pocketbase \
 #     superuser create admin@ucmerced.edu '<strong-password>' --dir=/pb/pb_data
 #
@@ -24,6 +27,10 @@ services:
   traefik:
     image: traefik:v3.3
     restart: unless-stopped
+    # Standalone boxes only: docker compose --profile standalone up. On hosts
+    # that already run a shared edge Traefik bound to 80/443 (vistacompute1),
+    # skip this service and layer docker-compose.vistacompute1.yml on top.
+    profiles: ["standalone"]
     command:
       - "--configFile=/etc/traefik/traefik.yml"
       # --- TLS alternative: Let's Encrypt HTTP-01 (per-hostname certs only, NOT
@@ -64,12 +71,12 @@ services:
       # SPA catch-all for ANY host in the wildcard zone. Lowest priority so the
       # /api/* proxies and /pb win. To pin the app to a single subdomain instead,
       # replace the rule with:  Host(`water3d.vistacompute1.ucmerced.edu`)
-      - 'traefik.http.routers.web.rule=HostRegexp(`^[a-zA-Z0-9-]+\.vistacompute1\.ucmerced\.edu$`)'
-      - "traefik.http.routers.web.priority=1"
-      - "traefik.http.routers.web.entrypoints=websecure"
-      - "traefik.http.routers.web.tls=true"
-      - "traefik.http.routers.web.middlewares=security-headers@file,gzip@file"
-      - "traefik.http.services.web.loadbalancer.server.port=80"
+      - 'traefik.http.routers.w3d-web.rule=HostRegexp(`^[a-zA-Z0-9-]+\.vistacompute1\.ucmerced\.edu$`)'
+      - "traefik.http.routers.w3d-web.priority=1"
+      - "traefik.http.routers.w3d-web.entrypoints=websecure"
+      - "traefik.http.routers.w3d-web.tls=true"
+      - "traefik.http.routers.w3d-web.middlewares=security-headers@file,gzip@file"
+      - "traefik.http.services.w3d-web.loadbalancer.server.port=80"
 
   pocketbase:
     image: ghcr.io/muchobien/pocketbase:latest  # pin a tag (e.g. :0.28.4) for reproducible prod builds
@@ -91,13 +98,13 @@ services:
       - "traefik.enable=true"
       # /pb/* → PocketBase's own /api/* (handle_path-style prefix strip). Priority
       # above the SPA catch-all, below the weather proxies.
-      - 'traefik.http.routers.pb.rule=HostRegexp(`^[a-zA-Z0-9-]+\.vistacompute1\.ucmerced\.edu$`) && PathPrefix(`/pb`)'
-      - "traefik.http.routers.pb.priority=50"
-      - "traefik.http.routers.pb.entrypoints=websecure"
-      - "traefik.http.routers.pb.tls=true"
-      - "traefik.http.routers.pb.middlewares=pb-strip@docker,security-headers@file,gzip@file"
-      - "traefik.http.middlewares.pb-strip.stripprefix.prefixes=/pb"
-      - "traefik.http.services.pb.loadbalancer.server.port=8090"
+      - 'traefik.http.routers.w3d-pb.rule=HostRegexp(`^[a-zA-Z0-9-]+\.vistacompute1\.ucmerced\.edu$`) && PathPrefix(`/pb`)'
+      - "traefik.http.routers.w3d-pb.priority=50"
+      - "traefik.http.routers.w3d-pb.entrypoints=websecure"
+      - "traefik.http.routers.w3d-pb.tls=true"
+      - "traefik.http.routers.w3d-pb.middlewares=w3d-pb-strip@docker,security-headers@file,gzip@file"
+      - "traefik.http.middlewares.w3d-pb-strip.stripprefix.prefixes=/pb"
+      - "traefik.http.services.w3d-pb.loadbalancer.server.port=8090"
 
 networks:
   edge:

@@ -1,0 +1,42 @@
+# Overlay for vistacompute1, where the shared ansible-managed Traefik
+# (traefik-ansible) already owns ports 80/443 — the bundled traefik service must
+# NOT run here (it is behind the "standalone" profile in docker-compose.yml).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.vistacompute1.yml up -d --build
+#
+# What this changes vs. the base file:
+#   * joins web + pocketbase to the external vistacompute-proxy network, which
+#     is the network the shared Traefik's docker provider routes through
+#     (traefik.docker.network tells it which of the containers' networks to use)
+#   * pins the routers to Host(water3d...) — the base file's wildcard HostRegexp
+#     catch-all would swallow every unmatched *.vistacompute1 subdomain on a
+#     shared edge
+#   * swaps middleware names to the shared Traefik's file-provider names
+#     (secure-headers/compress, defined in /opt/vistacompute/traefik/config/
+#     dynamic/middlewares.yml) — the base names (security-headers/gzip) only
+#     exist in the bundled traefik's dynamic.yml
+#
+# The /api/* weather proxies live in the shared Traefik's dynamic config
+# (/opt/vistacompute/traefik/config/dynamic/water3d.yml), not in this stack.
+
+name: water3d
+
+services:
+  web:
+    networks: [edge, proxy]
+    labels:
+      - "traefik.docker.network=vistacompute-proxy"
+      - "traefik.http.routers.w3d-web.rule=Host(`water3d.vistacompute1.ucmerced.edu`)"
+      - "traefik.http.routers.w3d-web.middlewares=secure-headers@file,compress@file"
+
+  pocketbase:
+    networks: [edge, proxy]
+    labels:
+      - "traefik.docker.network=vistacompute-proxy"
+      - "traefik.http.routers.w3d-pb.rule=Host(`water3d.vistacompute1.ucmerced.edu`) && PathPrefix(`/pb`)"
+      - "traefik.http.routers.w3d-pb.middlewares=w3d-pb-strip@docker,secure-headers@file,compress@file"
+
+networks:
+  proxy:
+    external: true
+    name: vistacompute-proxy
