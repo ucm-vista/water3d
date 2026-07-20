@@ -2,4 +2,6 @@
 export { mergeWeatherRecords, seasonWeatherEnabled, useChillWeather, useSeasonWeather, useYearWeather } from "./weather";
 export type { SeasonWeatherResult, YearWeatherResult } from "./weather";
 export { useAnalyticsSnapshot, useChillSeries, useStageProjections } from "./computations";
+export { CLIMATOLOGY_YEARS, useClimatology } from "./climatology";
+export type { ClimatologyResult } from "./climatology";
 export { weatherKeys } from "./keys";

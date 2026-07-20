@@ -1,6 +1,8 @@
 import { Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { getCropMetricProfile } from "../data/cropMetrics";
+import { celsiusToDisplayTemp, tempUnitSuffix } from "../utils/units";
+import { useUnits } from "../state/UnitsContext";
 import type { FieldConfig } from "../types/domain";
 import { FieldMapThumbnail } from "./FieldMapThumbnail";
 import { SetupPanel } from "./SetupPanel";
@@ -14,6 +16,8 @@ interface FieldManagerProps {
 }
 
 export function FieldManager({ fields, selectedFieldId, onSelectField, onCreateField, onUpdateField }: FieldManagerProps) {
+  const { unitSystem } = useUnits();
+  const tempSuffix = tempUnitSuffix(unitSystem);
   const [isAddingField, setIsAddingField] = useState(fields.length === 0);
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const editingField = fields.find((field) => field.id === editingFieldId);
@@ -83,7 +87,7 @@ export function FieldManager({ fields, selectedFieldId, onSelectField, onCreateF
               <div>
                 <dt>GDD Model</dt>
                 <dd>
-                  {gddBase}C / {gddUpper}C
+                  {celsiusToDisplayTemp(gddBase, unitSystem)}°{tempSuffix} / {celsiusToDisplayTemp(gddUpper, unitSystem)}°{tempSuffix}
                 </dd>
               </div>
               <div>

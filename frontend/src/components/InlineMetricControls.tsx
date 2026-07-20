@@ -1,8 +1,14 @@
 import { SlidersHorizontal } from "lucide-react";
+import { celsiusToDisplayTemp, displayTempToCelsius, tempUnitSuffix } from "../utils/units";
+import { useUnits } from "../state/UnitsContext";
+import { UnitToggle } from "./UnitToggle";
 import type { GraphSettings } from "./graphSettings";
 
 export type MetricView = "gdd" | "chill" | "et";
 export type GddChartMode = "cumulative" | "daily";
+// ET-view sub-mode: crop water demand, reference/atmospheric demand, or water
+// supply (precipitation). One curve family at a time keeps the chart legible.
+export type EtChartMode = "cropEt" | "referenceEt" | "precip";
 
 interface InlineMetricControlsProps {
   view: MetricView;
@@ -11,6 +17,8 @@ interface InlineMetricControlsProps {
   chillRequirement?: number;
   gddChartMode: GddChartMode;
   onGddChartModeChange: (mode: GddChartMode) => void;
+  etChartMode: EtChartMode;
+  onEtChartModeChange: (mode: EtChartMode) => void;
   onOpenAdvanced: () => void;
 }
 
@@ -25,8 +33,13 @@ export function InlineMetricControls({
   chillRequirement,
   gddChartMode,
   onGddChartModeChange,
+  etChartMode,
+  onEtChartModeChange,
   onOpenAdvanced,
 }: InlineMetricControlsProps) {
+  const { unitSystem } = useUnits();
+  const tempSuffix = tempUnitSuffix(unitSystem);
+
   function patch(next: Partial<GraphSettings>) {
     onChange({ ...settings, ...next });
   }
@@ -34,8 +47,6 @@ export function InlineMetricControls({
   return (
     <div className="inline-controls">
       <div className="inline-controls-fields">
-        {view === "gdd" ? <UnitToggle settings={settings} onChange={onChange} /> : null}
-
         {view === "gdd" ? (
           <div className="inline-segmented" role="group" aria-label="GDD chart type">
             <button type="button" className={gddChartMode === "cumulative" ? "selected" : ""} onClick={() => onGddChartModeChange("cumulative")}>
@@ -50,21 +61,21 @@ export function InlineMetricControls({
         {view === "chill" ? (
           <>
             <label className="inline-field">
-              <span>Min °C</span>
+              <span>Chill band min (°{tempSuffix})</span>
               <input
                 type="number"
                 step="0.1"
-                value={settings.chillThresholdMinC}
-                onChange={(event) => patch({ chillThresholdMinC: Number(event.target.value) })}
+                value={celsiusToDisplayTemp(settings.chillThresholdMinC, unitSystem)}
+                onChange={(event) => patch({ chillThresholdMinC: displayTempToCelsius(Number(event.target.value), unitSystem) })}
               />
             </label>
             <label className="inline-field">
-              <span>Max °C</span>
+              <span>Chill band max (°{tempSuffix})</span>
               <input
                 type="number"
                 step="0.1"
-                value={settings.chillThresholdMaxC}
-                onChange={(event) => patch({ chillThresholdMaxC: Number(event.target.value) })}
+                value={celsiusToDisplayTemp(settings.chillThresholdMaxC, unitSystem)}
+                onChange={(event) => patch({ chillThresholdMaxC: displayTempToCelsius(Number(event.target.value), unitSystem) })}
               />
             </label>
             {chillRequirement ? <span className="inline-readout">Requirement: {chillRequirement.toLocaleString()} hrs</span> : null}
@@ -72,42 +83,27 @@ export function InlineMetricControls({
         ) : null}
 
         {view === "et" ? (
-          <div className="inline-segmented" role="group" aria-label="ET units">
-            <button type="button" className={settings.etUnit === "mm" ? "selected" : ""} onClick={() => patch({ etUnit: "mm" })}>
-              mm
+          <div className="inline-segmented" role="group" aria-label="ET chart series">
+            <button type="button" className={etChartMode === "cropEt" ? "selected" : ""} onClick={() => onEtChartModeChange("cropEt")}>
+              Crop ET
             </button>
-            <button type="button" className={settings.etUnit === "in" ? "selected" : ""} onClick={() => patch({ etUnit: "in" })}>
-              in
+            <button type="button" className={etChartMode === "referenceEt" ? "selected" : ""} onClick={() => onEtChartModeChange("referenceEt")}>
+              Reference ET
+            </button>
+            <button type="button" className={etChartMode === "precip" ? "selected" : ""} onClick={() => onEtChartModeChange("precip")}>
+              Precipitation
             </button>
           </div>
         ) : null}
       </div>
 
-      <button type="button" className="inline-advanced-button" onClick={onOpenAdvanced}>
-        <SlidersHorizontal size={15} />
-        Advanced
-      </button>
-    </div>
-  );
-}
-
-function UnitToggle({ settings, onChange }: { settings: GraphSettings; onChange: (next: GraphSettings) => void }) {
-  return (
-    <div className="inline-segmented" role="group" aria-label="GDD units">
-      <button
-        type="button"
-        className={settings.unitSystem === "us" ? "selected" : ""}
-        onClick={() => onChange({ ...settings, unitSystem: "us" })}
-      >
-        °F
-      </button>
-      <button
-        type="button"
-        className={settings.unitSystem === "metric" ? "selected" : ""}
-        onClick={() => onChange({ ...settings, unitSystem: "metric" })}
-      >
-        °C
-      </button>
+      <div className="inline-controls-actions">
+        <UnitToggle />
+        <button type="button" className="inline-advanced-button" onClick={onOpenAdvanced}>
+          <SlidersHorizontal size={15} />
+          Advanced
+        </button>
+      </div>
     </div>
   );
 }

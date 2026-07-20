@@ -1,5 +1,6 @@
 import { ChevronRight, RotateCcw } from "lucide-react";
-import { gddUnitFactor, gddUnitLabel } from "../utils/units";
+import { celsiusToDisplayTemp, displayTempToCelsius, gddUnitFactor, gddUnitLabel, tempUnitSuffix } from "../utils/units";
+import { useUnits } from "../state/UnitsContext";
 import type { MetricView } from "./InlineMetricControls";
 import { Modal } from "./Modal";
 import {
@@ -31,12 +32,15 @@ const TOGGLE_LABELS: Partial<Record<keyof GraphSeriesVisibility, string>> = {
   forecast: "Show forecast extension",
   projection: "Show projection to year-end",
   dataMarkers: "Show data-point markers",
-  etCumulative: "Show crop ET (cumulative ETc)",
-  referenceEt: "Show reference ETo (this year)",
+  climatologyNormal: "Show 30-yr normal",
+  climatologyBand: "Show 30-yr P10–P90 band",
   etReferencePriorYear: "Show prior-year reference ETo",
-  etReferenceNormal: "Show 5-yr average reference ETo",
+  etReferenceNormal: "Show 30-yr average reference ETo",
   etDailyBars: "Show daily ET bars",
   forecastBand: "Show forecast uncertainty band",
+  precipDailyBars: "Show daily precipitation bars",
+  precipNormal: "Show 30-yr average precipitation",
+  precipBand: "Show 30-yr P10–P90 precipitation band",
 };
 
 // Advanced, less-common graph options. All controls write straight through to
@@ -55,8 +59,10 @@ export function AdvancedGraphSettings({
   biofixLabel,
   onEditStages,
 }: AdvancedGraphSettingsProps) {
-  const unitFactor = gddUnitFactor(settings.unitSystem);
-  const unitLabel = gddUnitLabel(settings.unitSystem);
+  const { unitSystem } = useUnits();
+  const unitFactor = gddUnitFactor(unitSystem);
+  const unitLabel = gddUnitLabel(unitSystem);
+  const tempSuffix = tempUnitSuffix(unitSystem);
 
   const availableYears: number[] = [];
   for (let year = maxYear; year >= minYear; year--) {
@@ -235,6 +241,8 @@ export function AdvancedGraphSettings({
               <Toggle label={TOGGLE_LABELS.currentSeason!} checked={settings.show.currentSeason} onChange={() => toggleShow("currentSeason")} />
               <Toggle label={TOGGLE_LABELS.forecast!} checked={settings.show.forecast} onChange={() => toggleShow("forecast")} />
               <Toggle label={TOGGLE_LABELS.projection!} checked={settings.show.projection} onChange={() => toggleShow("projection")} />
+              <Toggle label={TOGGLE_LABELS.climatologyNormal!} checked={settings.show.climatologyNormal} onChange={() => toggleShow("climatologyNormal")} />
+              <Toggle label={TOGGLE_LABELS.climatologyBand!} checked={settings.show.climatologyBand} onChange={() => toggleShow("climatologyBand")} />
               <Toggle label={TOGGLE_LABELS.dataMarkers!} checked={settings.show.dataMarkers} onChange={() => toggleShow("dataMarkers")} />
             </section>
 
@@ -292,13 +300,6 @@ export function AdvancedGraphSettings({
             </section>
 
             <section className="settings-section">
-              <h3>ET Series</h3>
-              <p className="settings-hint">Choose which evapotranspiration curves to display.</p>
-              <Toggle label={TOGGLE_LABELS.etCumulative!} checked={settings.show.etCumulative} onChange={() => toggleShow("etCumulative")} />
-              <Toggle label={TOGGLE_LABELS.referenceEt!} checked={settings.show.referenceEt} onChange={() => toggleShow("referenceEt")} />
-            </section>
-
-            <section className="settings-section">
               <h3>Year-over-year comparison</h3>
               <p className="settings-hint">
                 Overlay reference ETo (atmospheric demand) from prior seasons, aligned to this season by calendar day, so you can
@@ -311,19 +312,19 @@ export function AdvancedGraphSettings({
 
             <section className="settings-section">
               <h3>Daily ET Bars</h3>
-              <p className="settings-hint">Per-day crop ET drawn as bars on the right axis.</p>
+              <p className="settings-hint">Per-day crop ET drawn as bars on the right axis. Units follow the global °F/°C toggle above the chart.</p>
               <Toggle label={TOGGLE_LABELS.etDailyBars!} checked={settings.show.etDailyBars} onChange={() => toggleShow("etDailyBars")} />
-              <label className="settings-inline-field">
-                <span>Units</span>
-                <div className="settings-segmented" role="group" aria-label="ET units">
-                  <button type="button" className={settings.etUnit === "mm" ? "selected" : ""} onClick={() => update({ etUnit: "mm" })}>
-                    mm
-                  </button>
-                  <button type="button" className={settings.etUnit === "in" ? "selected" : ""} onClick={() => update({ etUnit: "in" })}>
-                    in
-                  </button>
-                </div>
-              </label>
+            </section>
+
+            <section className="settings-section">
+              <h3>Precipitation</h3>
+              <p className="settings-hint">
+                Water supply for the Precipitation sub-mode: daily totals as bars, plus the 30-yr average and P10–P90 band of
+                cumulative precipitation from gridMET history.
+              </p>
+              <Toggle label={TOGGLE_LABELS.precipDailyBars!} checked={settings.show.precipDailyBars} onChange={() => toggleShow("precipDailyBars")} />
+              <Toggle label={TOGGLE_LABELS.precipNormal!} checked={settings.show.precipNormal} onChange={() => toggleShow("precipNormal")} />
+              <Toggle label={TOGGLE_LABELS.precipBand!} checked={settings.show.precipBand} onChange={() => toggleShow("precipBand")} />
             </section>
 
             <section className="settings-section">
@@ -340,21 +341,21 @@ export function AdvancedGraphSettings({
             <p className="settings-hint">Hours are counted when the temperature falls between these bounds.</p>
             <div className="settings-field-grid">
               <label>
-                <span>Min °C</span>
+                <span>Chill band min (°{tempSuffix})</span>
                 <input
                   type="number"
                   step="0.1"
-                  value={settings.chillThresholdMinC}
-                  onChange={(event) => update({ chillThresholdMinC: Number(event.target.value) })}
+                  value={celsiusToDisplayTemp(settings.chillThresholdMinC, unitSystem)}
+                  onChange={(event) => update({ chillThresholdMinC: displayTempToCelsius(Number(event.target.value), unitSystem) })}
                 />
               </label>
               <label>
-                <span>Max °C</span>
+                <span>Chill band max (°{tempSuffix})</span>
                 <input
                   type="number"
                   step="0.1"
-                  value={settings.chillThresholdMaxC}
-                  onChange={(event) => update({ chillThresholdMaxC: Number(event.target.value) })}
+                  value={celsiusToDisplayTemp(settings.chillThresholdMaxC, unitSystem)}
+                  onChange={(event) => update({ chillThresholdMaxC: displayTempToCelsius(Number(event.target.value), unitSystem) })}
                 />
               </label>
             </div>

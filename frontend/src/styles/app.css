@@ -3291,6 +3291,21 @@ dd {
   color: #ffffff;
 }
 
+.inline-controls-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.inline-controls-actions .unit-toggle {
+  height: 38px;
+}
+
+.inline-controls-actions .unit-toggle button {
+  height: 36px;
+}
+
 .inline-advanced-button {
   display: inline-flex;
   align-items: center;

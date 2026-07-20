@@ -11,7 +11,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { buildAnalyticsSnapshot } from "../../calcs/analytics";
-import { cumulativeChillHours } from "../../calcs/chillHours";
+import { cumulativeChillPortions } from "../../calcs/dynamicModel";
 import { buildStageProjections } from "../../calcs/stageProjection";
 import type { AnalyticsSnapshot, CropProfile, DailyAnalytics, FieldConfig, StageThreshold, WeatherRecord } from "../../types/domain";
 import { snapshotInputsHash, weatherSignature } from "./keys";
@@ -39,11 +39,11 @@ export function useAnalyticsSnapshot(field: FieldConfig, crop: CropProfile, weat
   return query.data ?? buildAnalyticsSnapshot(field, crop, weather, []);
 }
 
-// Cumulative chill-hour series for the dormant season.
-export function useChillSeries(records: WeatherRecord[], minC: number, maxC: number) {
-  const compute = () => cumulativeChillHours(records, minC, maxC);
+// Cumulative Chill Portions (Dynamic Model) series for the dormant season.
+export function useChillSeries(records: WeatherRecord[]) {
+  const compute = () => cumulativeChillPortions(records);
   const query = useQuery({
-    queryKey: ["calc", "chill", weatherSignature(records), minC, maxC],
+    queryKey: ["calc", "chill-portions", weatherSignature(records)],
     staleTime: Infinity,
     queryFn: async () => compute(),
   });

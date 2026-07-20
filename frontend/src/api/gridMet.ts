@@ -120,13 +120,17 @@ export function getGridMetAvailableThrough(qualityFlags: string[] | undefined): 
 // per profile and the timeout is far above the fetch default.
 const GRIDMET_TIMEOUT_MS = 90_000;
 
-const VARIABLE_PROFILES: Record<"full" | "temperature" | "temperature_et", { required: GridMetVariableCode[]; optional: GridMetVariableCode[] }> = {
+const VARIABLE_PROFILES: Record<"full" | "temperature" | "temperature_et" | "climatology", { required: GridMetVariableCode[]; optional: GridMetVariableCode[] }> = {
   full: { required: ["tmmn", "tmmx", "pet"], optional: ["pr", "rmax", "rmin", "vpd"] },
   temperature: { required: ["tmmn", "tmmx"], optional: [] },
   // Temps + reference ET (pet) for the year-over-year overlays: GDD needs the
   // temperatures, the ET view needs reference ETo. One extra request per year
   // versus "temperature", without the humidity/precip/vpd of the "full" pull.
   temperature_et: { required: ["tmmn", "tmmx", "pet"], optional: [] },
+  // 30-year normal computation: temps + ETo + precip over a multi-decade range.
+  // gridMET serves each variable from one aggregated 1979→present file, so the
+  // whole window is still a single request per variable.
+  climatology: { required: ["tmmn", "tmmx", "pet"], optional: ["pr"] },
 };
 
 export class GridMetProvider {
@@ -197,6 +201,7 @@ export class GridMetProvider {
 
     const seriesByVariable: GridMetSeriesByVariable = {};
     const failures: string[] = [];
+    const missingOptional: GridMetVariableCode[] = [];
 
     results.forEach((result, index) => {
       const variable = variables[index];
@@ -204,6 +209,11 @@ export class GridMetProvider {
         seriesByVariable[variable] = result.value;
       } else if (profile.required.includes(variable)) {
         failures.push(result.status === "rejected" ? (result.reason instanceof Error ? result.reason.message : String(result.reason)) : `gridMET ${variable} returned no records.`);
+      } else {
+        // Optional variables (e.g. pr) default to 0 in the built records, which
+        // is indistinguishable from a genuinely dry day — flag the gap so the
+        // UI can warn instead of silently charting zeros.
+        missingOptional.push(variable);
       }
     });
 
@@ -222,7 +232,10 @@ export class GridMetProvider {
         provider: "gridmet",
         generatedAt: new Date().toISOString(),
         sourceUrl: gridMetApi.urls.netcdfData,
-        qualityFlags: buildGridMetQualityFlags(records, request.endDate),
+        qualityFlags: [
+          ...buildGridMetQualityFlags(records, request.endDate),
+          ...missingOptional.map((variable) => `missing-variable:${variable}`),
+        ],
       },
     };
   }

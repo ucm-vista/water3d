@@ -1,6 +1,8 @@
 import { Plus, RotateCcw, Trash2 } from "lucide-react";
 import { getCropMetricProfile } from "../data/cropMetrics";
+import { useUnits } from "../state/UnitsContext";
 import type { CropId, FieldConfig, StageThreshold } from "../types/domain";
+import { celsiusToDisplayTemp, displayTempToCelsius, tempUnitSuffix } from "../utils/units";
 import { CropSelect, cropOptionLabel } from "./CropSelect";
 
 interface FieldEditorFormProps {
@@ -67,9 +69,12 @@ export function CropField({ draft, onChange }: FieldFieldsProps) {
   );
 }
 
-// Planting/biofix date + the GDD base/upper temperatures.
+// Planting/biofix date + the GDD base/upper temperatures. Thresholds are stored
+// in °C; the inputs display and accept the global unit system's temperature.
 export function SeasonGddFields({ draft, onChange }: FieldFieldsProps) {
   const cropMetrics = getCropMetricProfile(draft.cropId);
+  const { unitSystem } = useUnits();
+  const tempSuffix = tempUnitSuffix(unitSystem);
 
   function patch(next: Partial<FieldConfig>) {
     onChange({ ...draft, ...next });
@@ -90,14 +95,25 @@ export function SeasonGddFields({ draft, onChange }: FieldFieldsProps) {
       </div>
       <div className="parameter-grid parameter-grid-pair">
         <label>
-          <span>Base Tmin (&deg;C)</span>
-          <input type="number" step="0.1" value={draft.gddBaseTempC ?? cropMetrics.gdd.baseTempC} onChange={(event) => patch({ gddBaseTempC: Number(event.target.value) })} />
+          <span>GDD base temp (&deg;{tempSuffix})</span>
+          <input
+            type="number"
+            step="0.1"
+            value={celsiusToDisplayTemp(draft.gddBaseTempC ?? cropMetrics.gdd.baseTempC, unitSystem)}
+            onChange={(event) => patch({ gddBaseTempC: displayTempToCelsius(Number(event.target.value), unitSystem) })}
+          />
         </label>
         <label>
-          <span>Upper Tmax (&deg;C)</span>
-          <input type="number" step="0.1" value={draft.gddUpperTempC ?? cropMetrics.gdd.upperTempC} onChange={(event) => patch({ gddUpperTempC: Number(event.target.value) })} />
+          <span>GDD upper cutoff (&deg;{tempSuffix})</span>
+          <input
+            type="number"
+            step="0.1"
+            value={celsiusToDisplayTemp(draft.gddUpperTempC ?? cropMetrics.gdd.upperTempC, unitSystem)}
+            onChange={(event) => patch({ gddUpperTempC: displayTempToCelsius(Number(event.target.value), unitSystem) })}
+          />
         </label>
       </div>
+      <p className="editor-hint">Temperature thresholds for degree-day accumulation &mdash; not daily min/max temperatures.</p>
     </>
   );
 }

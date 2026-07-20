@@ -6,6 +6,11 @@ the only server is PocketBase (persistence/auth).
 
 ---
 
+> **Maintainers:** `frontend/src/config/apiRegistry.ts` is the machine-readable
+> registry of every service below — upstream URL, proxy path, config/provider
+> module, and data-owner contact (e.g. Katherine at the Climate Toolbox). Start
+> there when an endpoint moves or you need to know who owns a source.
+
 ## Summary — APIs at a glance
 
 ### gridMET (primary observed history)

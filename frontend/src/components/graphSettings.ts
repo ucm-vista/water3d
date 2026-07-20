@@ -1,5 +1,3 @@
-import type { EtUnit, UnitSystem } from "../utils/units";
-
 export const MAX_COMPARISON_YEARS = 4;
 
 export type GraphSettingsSection = "season" | "comparison" | "targets" | "display" | "axis";
@@ -8,16 +6,18 @@ export interface GraphSeriesVisibility {
   stages: boolean;
   stageLabels: boolean;
   currentSeason: boolean;
-  fiveYearNormal: boolean;
+  climatologyNormal: boolean;
+  climatologyBand: boolean;
   selectedYears: boolean;
   forecast: boolean;
   projection: boolean;
-  referenceEt: boolean;
   etReferencePriorYear: boolean;
   etReferenceNormal: boolean;
-  etCumulative: boolean;
   etDailyBars: boolean;
   forecastBand: boolean;
+  precipDailyBars: boolean;
+  precipNormal: boolean;
+  precipBand: boolean;
   dataMarkers: boolean;
 }
 
@@ -31,9 +31,7 @@ export interface GraphSettings {
   gddUpperTempC: number;
   chillThresholdMinC: number;
   chillThresholdMaxC: number;
-  etUnit: EtUnit;
   yAxisMax: number | null;
-  unitSystem: UnitSystem;
   show: GraphSeriesVisibility;
 }
 
@@ -47,7 +45,6 @@ export interface GraphSettingsDefaultsInput {
   gddUpperTempC: number;
   chillThresholdMinC: number;
   chillThresholdMaxC: number;
-  unitSystem: UnitSystem;
 }
 
 export function buildDefaultGraphSettings(input: GraphSettingsDefaultsInput): GraphSettings {
@@ -61,23 +58,23 @@ export function buildDefaultGraphSettings(input: GraphSettingsDefaultsInput): Gr
     gddUpperTempC: input.gddUpperTempC,
     chillThresholdMinC: input.chillThresholdMinC,
     chillThresholdMaxC: input.chillThresholdMaxC,
-    etUnit: "in",
     yAxisMax: null,
-    unitSystem: input.unitSystem,
     show: {
       stages: true,
       stageLabels: true,
       currentSeason: true,
-      fiveYearNormal: true,
+      climatologyNormal: true,
+      climatologyBand: true,
       selectedYears: true,
       forecast: true,
       projection: true,
-      referenceEt: true,
       etReferencePriorYear: true,
       etReferenceNormal: true,
-      etCumulative: true,
       etDailyBars: true,
       forecastBand: true,
+      precipDailyBars: true,
+      precipNormal: true,
+      precipBand: true,
       dataMarkers: false,
     },
   };

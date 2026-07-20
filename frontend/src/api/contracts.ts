@@ -55,7 +55,7 @@ export interface WeatherDataRequest extends ApiDateRange, Coordinates {
   // "temperature" fetches only tmin/tmax — enough for GDD comparisons and far
   // cheaper against slow providers like gridMET (one request per variable).
   // "temperature_et" adds reference ET (pet) for the ET year-over-year overlays.
-  variableProfile?: "full" | "temperature" | "temperature_et";
+  variableProfile?: "full" | "temperature" | "temperature_et" | "climatology";
 }
 
 export interface WeatherDataResponse {

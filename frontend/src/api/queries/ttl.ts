@@ -4,7 +4,10 @@
 // be restored from localStorage across reloads. Bump `CACHE_BUSTER` whenever the
 // cached data shape changes to invalidate every persisted entry at once.
 
-export const CACHE_BUSTER = "w3d-cache-v1";
+// v3: ClimatologyStats gained P10/P50/P90 percentile fields (GDD band). Pre-v3
+// persisted stats have only the mean, so the band/P50 silently render nothing
+// until the stale entry is dropped.
+export const CACHE_BUSTER = "w3d-cache-v3";
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -17,6 +20,8 @@ export const TTL = {
   chillWeather: 12 * HOUR,
   // Prior full calendar years are immutable once published.
   priorYearWeather: 30 * DAY,
+  // The 30-yr climatology window only shifts at year boundaries.
+  climatologyWeather: 30 * DAY,
   // The current year as an overlay still accumulates, so keep it short.
   currentYearWeather: 6 * HOUR,
 } as const;

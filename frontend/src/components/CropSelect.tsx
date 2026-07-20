@@ -1,6 +1,8 @@
 import { ChevronDown, Sprout } from "lucide-react";
 import { cropOptions } from "../data/crops";
 import { getCropMetricProfile } from "../data/cropMetrics";
+import { celsiusToDisplayTemp, tempUnitSuffix } from "../utils/units";
+import { useUnits } from "../state/UnitsContext";
 import type { CropId } from "../types/domain";
 
 interface CropSelectProps {
@@ -18,6 +20,8 @@ export function cropOptionLabel(cropId: CropId): string {
 
 export function CropSelect({ value, onChange, id, showSummary = true }: CropSelectProps) {
   const metrics = getCropMetricProfile(value);
+  const { unitSystem } = useUnits();
+  const tempSuffix = tempUnitSuffix(unitSystem);
 
   return (
     <div className="crop-select">
@@ -39,7 +43,7 @@ export function CropSelect({ value, onChange, id, showSummary = true }: CropSele
       </div>
       {showSummary ? (
         <p className="crop-select-summary">
-          {metrics.perennial ? "Perennial" : "Annual"} &middot; Base {metrics.gdd.baseTempC}&deg;C / Cap {metrics.gdd.upperTempC}&deg;C
+          {metrics.perennial ? "Perennial" : "Annual"} &middot; Base {celsiusToDisplayTemp(metrics.gdd.baseTempC, unitSystem)}&deg;{tempSuffix} / Cap {celsiusToDisplayTemp(metrics.gdd.upperTempC, unitSystem)}&deg;{tempSuffix}
           {metrics.chill.enabled && metrics.chill.requirement ? ` · ~${metrics.chill.requirement} chill hrs` : ""}
         </p>
       ) : null}

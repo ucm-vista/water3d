@@ -18,7 +18,17 @@ export function QueryProvider({ children }: { children: ReactNode }) {
   return (
     <PersistQueryClientProvider
       client={queryClient}
-      persistOptions={{ persister, maxAge: PERSIST_MAX_AGE, buster: CACHE_BUSTER }}
+      persistOptions={{
+        persister,
+        maxAge: PERSIST_MAX_AGE,
+        buster: CACHE_BUSTER,
+        dehydrateOptions: {
+          // Queries opting out via meta.persist stay in-memory only — used for
+          // the raw multi-decade climatology fetch, which would blow the ~5 MB
+          // localStorage quota (only its small derived stats are persisted).
+          shouldDehydrateQuery: (query) => query.state.status === "success" && query.meta?.persist !== false,
+        },
+      }}
     >
       {children}
     </PersistQueryClientProvider>

@@ -1,4 +1,4 @@
-import { CalendarClock, Download, Droplets, Gauge, Info, Sprout, ThermometerSun } from "lucide-react";
+import { CalendarClock, Download, Droplets, Gauge, Image as ImageIcon, Info, Sprout, ThermometerSun } from "lucide-react";
 import { Area, Bar, Customized, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useIsRestoring } from "@tanstack/react-query";
 import { climateToolboxApi } from "../api/climate";
@@ -8,13 +8,16 @@ import {
   useAnalyticsSnapshot,
   useChillSeries,
   useChillWeather,
+  useClimatology,
   useSeasonWeather,
   useStageProjections,
   useYearWeather,
 } from "../api/queries";
 import { buildAnalyticsSnapshot } from "../calcs/analytics";
-import { cumulativeChillHours, getChillSeasonStart } from "../calcs/chillHours";
-import { averageDailyGddByMonthDay, daysAheadOfNormal, findThresholdDate } from "../calcs/stageProjection";
+import { getChillSeasonStart } from "../calcs/chillHours";
+import { cumulativeChillPortions } from "../calcs/dynamicModel";
+import { splitSeasonSeries } from "../calcs/gddSeries";
+import { daysAheadOfNormal, findThresholdDate } from "../calcs/stageProjection";
 import { cropProfiles } from "../data/crops";
 import { getCropMetricProfile } from "../data/cropMetrics";
 import type { FieldConfig, WeatherRecord } from "../types/domain";
@@ -24,16 +27,17 @@ import { downloadCsv } from "../utils/exportCsv";
 import {
   celsiusToDisplayTemp,
   etUnitFactor,
+  etUnitForSystem,
   etUnitLabel,
   gddUnitFactor,
   gddUnitLabel,
-  loadUnitSystem,
-  saveUnitSystem,
   tempUnitSuffix,
 } from "../utils/units";
+import { useUnits } from "../state/UnitsContext";
+import { buildFieldPrefs, localPreferencesRepository, mergeGraphSettings } from "../utils/preferencesStorage";
 import { MetricCard } from "./MetricCard";
 import { AdvancedGraphSettings } from "./AdvancedGraphSettings";
-import { InlineMetricControls, type GddChartMode, type MetricView } from "./InlineMetricControls";
+import { InlineMetricControls, type EtChartMode, type GddChartMode, type MetricView } from "./InlineMetricControls";
 import { ChartLoader } from "./ChartLoader";
 import { buildDefaultGraphSettings, FORECAST_RANGE_OPTIONS, type GraphSettings } from "./graphSettings";
 
@@ -41,12 +45,20 @@ import { buildDefaultGraphSettings, FORECAST_RANGE_OPTIONS, type GraphSettings }
 // clamps what it *shows* to the range the user picked. Keep these in sync so a
 // "+28 days" selection never asks for more data than we requested.
 const MAX_FORECAST_DAYS = Math.max(...FORECAST_RANGE_OPTIONS);
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toPng } from "html-to-image";
 
 interface DashboardProps {
   field: FieldConfig;
   onEditStages?: () => void;
 }
+
+// GDD chart series colors. Current year (observed history + its dashed
+// projection) reads red; the 30-year climatological normal (line, median, and
+// P10–P90 band) reads blue and is labelled "Historical (30 year average)".
+const GDD_CURRENT_COLOR = "#c0392b";
+const GDD_NORMAL_COLOR = "#2c6fb0";
+const GDD_NORMAL_BAND_COLOR = "#bcd3ea";
 
 const COMPARISON_YEAR_COLORS = ["#a87945", "#7d8b52", "#b26046"];
 
@@ -54,11 +66,19 @@ function comparisonYearColor(index: number): string {
   return COMPARISON_YEAR_COLORS[index % COMPARISON_YEAR_COLORS.length];
 }
 
+// Human-readable coordinates for the chart title, e.g. "36.7378° N, 119.7871° W".
+function formatLatLon(lat: number, lon: number): string {
+  const ns = lat >= 0 ? "N" : "S";
+  const ew = lon >= 0 ? "E" : "W";
+  return `${Math.abs(lat).toFixed(4)}° ${ns}, ${Math.abs(lon).toFixed(4)}° ${ew}`;
+}
+
 // Reference-ETo year-over-year overlays use a cooler (blue) palette so they read
 // as the "reference ETo" family yet stay distinct from the rust current-season
 // reference ETo line and the crop-ET / daily-bar colors.
 const ETO_COMPARISON_YEAR_COLORS = ["#5f8fc0", "#4f8a8b", "#8a86c9"];
 const ETO_NORMAL_COLOR = "#3f6486";
+const PRECIP_NORMAL_COLOR = "#2f7d95";
 
 function etoComparisonYearColor(index: number): string {
   return ETO_COMPARISON_YEAR_COLORS[index % ETO_COMPARISON_YEAR_COLORS.length];
@@ -189,14 +209,10 @@ function setIsoYear(date: string, year: number): string {
   return `${year}${date.slice(4)}`;
 }
 
-function getBaselineYears(currentYear: number, count = 5): number[] {
-  return Array.from({ length: count }, (_, index) => currentYear - count + index);
-}
-
 const EMPTY_RECORDS: WeatherRecord[] = [];
 
-// Narrow a year->weather map to a specific set of years (e.g. the comparison
-// selection or the 5-yr-normal window) drawn from the shared per-year cache.
+// Narrow a year->weather map to a specific set of years (the comparison
+// selection) drawn from the shared per-year cache.
 function pickYears(byYear: Record<number, WeatherRecord[]>, years: number[]): Record<number, WeatherRecord[]> {
   const selected: Record<number, WeatherRecord[]> = {};
   for (const year of years) {
@@ -218,13 +234,8 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   const cropDisplayName = field.cropId === "other" ? field.cropLabel.trim() || cropMetrics.displayName : cropMetrics.displayName;
   const metricStages = field.stageThresholds?.length ? field.stageThresholds : cropMetrics.gdd.stages;
 
-  // Default overlays: most-recent prior year + 5-yr average only. Additional
-  // comparison years remain available via Advanced settings.
-  const mostRecentComparisonYear = useMemo(
-    () => (cropMetrics.comparisonYears.length ? Math.max(...cropMetrics.comparisonYears) : currentYear - 1),
-    [cropMetrics.comparisonYears, currentYear],
-  );
-
+  // Default overlays: 30-yr normal only. Comparison years start unselected and
+  // are added by the user via Advanced settings.
   const defaultSettings = useMemo(
     () =>
       buildDefaultGraphSettings({
@@ -232,14 +243,13 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         endDate: todayIso,
         forecastDays: climateToolboxApi.enabled ? 28 : 0,
         comparisonYears: cropMetrics.comparisonYears,
-        selectedComparisonYears: [mostRecentComparisonYear],
+        selectedComparisonYears: [],
         gddBaseTempC: field.gddBaseTempC ?? cropMetrics.gdd.baseTempC,
         gddUpperTempC: field.gddUpperTempC ?? cropMetrics.gdd.upperTempC,
         chillThresholdMinC: cropMetrics.chill.thresholdMinC ?? 0,
         chillThresholdMaxC: cropMetrics.chill.thresholdMaxC ?? 7.2,
-        unitSystem: loadUnitSystem(),
       }),
-    [cropMetrics, defaultStartDate, field.gddBaseTempC, field.gddUpperTempC, mostRecentComparisonYear, todayIso],
+    [cropMetrics, defaultStartDate, field.gddBaseTempC, field.gddUpperTempC, todayIso],
   );
 
   // Single live settings object — every control writes through and the chart
@@ -250,14 +260,25 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   // GDD view can render either the cumulative curve or daily-accumulation bars
   // (the reviewer asked for a bar option alongside the cumulative chart).
   const [gddChartMode, setGddChartMode] = useState<GddChartMode>("cumulative");
+  // ET view renders one curve family at a time (reviewer feedback: crop ET and
+  // reference ET on one chart read as clutter), plus a precipitation mode.
+  const [etChartMode, setEtChartMode] = useState<EtChartMode>("cropEt");
+  const [exportingImage, setExportingImage] = useState(false);
+  // Captured by the "Export Image" action (title + chart + legend → PNG).
+  const chartPanelRef = useRef<HTMLElement>(null);
+  const fileSlug = useMemo(
+    () => field.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "field",
+    [field.name],
+  );
 
   const selectedStartDate = settings.startDate;
   const forecastDays = settings.forecastDays;
-  const unitSystem = settings.unitSystem;
+  const { unitSystem } = useUnits();
   const unitFactor = gddUnitFactor(unitSystem);
   const unitLabel = gddUnitLabel(unitSystem);
-  const etFactor = etUnitFactor(settings.etUnit);
-  const etLabel = etUnitLabel(settings.etUnit);
+  const etUnit = etUnitForSystem(unitSystem);
+  const etFactor = etUnitFactor(etUnit);
+  const etLabel = etUnitLabel(etUnit);
   const comparisonYears = settings.comparisonYears;
   const selectedComparisonYears = settings.selectedComparisonYears;
   const show = settings.show;
@@ -315,35 +336,38 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   });
   const chillWeatherRecords = chillQuery.data ?? EMPTY_RECORDS;
 
-  // Comparison + 5-yr-normal overlays share one per-year cache; toggling which
-  // years are shown never refetches a year already loaded this session.
-  const baselineYears = useMemo(() => getBaselineYears(currentYear), [currentYear]);
-  const overlayYears = useMemo(
-    () => [...new Set([...selectedComparisonYears, ...baselineYears])],
-    [selectedComparisonYears, baselineYears],
-  );
+  // Comparison overlays share one per-year cache; toggling which years are
+  // shown never refetches a year already loaded this session. The 30-yr normal
+  // curves come from the separate climatology query below.
   const yearWeather = useYearWeather({
     cropId: field.cropId,
     lat: field.lat,
     lon: field.lon,
-    years: overlayYears,
+    years: selectedComparisonYears,
     currentYear,
   });
   const comparisonWeatherByYear = useMemo(
     () => pickYears(yearWeather.byYear, selectedComparisonYears),
     [yearWeather.byYear, selectedComparisonYears],
   );
-  const baselineWeatherByYear = useMemo(
-    () => pickYears(yearWeather.byYear, baselineYears),
-    [yearWeather.byYear, baselineYears],
-  );
+
+  // 30-year climatology (mean + P10/P50/P90 by calendar day) for the "normal"
+  // overlays, percentile bands, and the stage-projection daily rate.
+  const climatology = useClimatology({
+    lat: field.lat,
+    lon: field.lon,
+    currentYear,
+    gddBaseTempC: settings.gddBaseTempC,
+    gddUpperTempC: settings.gddUpperTempC,
+    alignStartMonthDay: selectedStartDate.slice(5),
+  });
 
   // Strict TTL: show the loader while the persisted cache is still restoring,
   // while there is no usable data, or while a stale (expired) entry is being
   // revalidated — never render stale data.
   const weatherLoading =
     seasonWeatherEnabled && (isRestoring || seasonQuery.isLoading || (seasonQuery.isFetching && seasonQuery.isStale));
-  const overlaysLoading = gridMetApi.enabled && yearWeather.isFetching;
+  const overlaysLoading = gridMetApi.enabled && (yearWeather.isFetching || climatology.isFetching);
   const dataWarning = useMemo<string | null>(() => {
     if (!seasonWeatherEnabled) return "gridMET and Climate Toolbox are disabled. No weather data will be displayed.";
     if (seasonQuery.isError) return seasonQuery.error instanceof Error ? seasonQuery.error.message : "Weather data could not be loaded.";
@@ -351,20 +375,28 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
     return warnings.length ? warnings.join(" ") : null;
   }, [seasonQuery.data, seasonQuery.isError, seasonQuery.error]);
 
-  // Reset live settings to this field/crop's defaults when the field changes.
+  // When the field changes, rebuild live settings from this field/crop's
+  // defaults merged with any persisted preferences for the field.
   useEffect(() => {
-    setSettings(defaultSettings);
+    const prefs = localPreferencesRepository.load(field.id);
+    setSettings(mergeGraphSettings(defaultSettings, prefs, { cropId: field.cropId, currentYear }));
     setAdvancedOpen(false);
     setView("gdd");
-    setGddChartMode("cumulative");
-  }, [defaultSettings]);
+    setGddChartMode(prefs?.cropId === field.cropId ? (prefs?.gddChartMode ?? "cumulative") : "cumulative");
+    setEtChartMode(prefs?.cropId === field.cropId ? (prefs?.etChartMode ?? "cropEt") : "cropEt");
+  }, [defaultSettings, field.id, field.cropId, currentYear]);
 
+  // Write-through persistence: any settings/mode change updates the stored
+  // per-field preferences (small payload, so no debounce needed).
   useEffect(() => {
-    saveUnitSystem(settings.unitSystem);
-  }, [settings.unitSystem]);
+    localPreferencesRepository.save(field.id, buildFieldPrefs(settings, { gddChartMode, etChartMode }, field.cropId));
+  }, [settings, gddChartMode, etChartMode, field.id, field.cropId]);
 
   function resetSettings() {
+    localPreferencesRepository.clear(field.id);
     setSettings(defaultSettings);
+    setGddChartMode("cumulative");
+    setEtChartMode("cropEt");
   }
 
   const analysisField = useMemo(() => ({ ...field, stageStartDate: selectedStartDate }), [field, selectedStartDate]);
@@ -380,31 +412,13 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
       .filter((entry): entry is readonly [number, ReturnType<typeof buildAnalyticsSnapshot>] => entry !== null);
     return Object.fromEntries(entries);
   }, [comparisonWeatherByYear, field, metricCrop, selectedStartDate]);
-  const baselineSnapshots = useMemo(
-    () =>
-      Object.entries(baselineWeatherByYear)
-        .map(([year, records]) => {
-          const baselineField = { ...field, stageStartDate: setIsoYear(selectedStartDate, Number(year)) };
-          return buildAnalyticsSnapshot(baselineField, metricCrop, records, []);
-        })
-        .filter((baselineSnapshot) => baselineSnapshot.records.length),
-    [baselineWeatherByYear, field, metricCrop, selectedStartDate],
+  // Overlay curves aligned to the current season by calendar day (MM-DD), read
+  // from the 30-yr climatology stats.
+  const climatologyByMonthDay = climatology.stats?.byMonthDay;
+  const normalCumulativeByMonthDay = useMemo(
+    () => new Map(Object.entries(climatologyByMonthDay ?? {}).map(([key, day]) => [key, day.gddCumMean])),
+    [climatologyByMonthDay],
   );
-
-  // Overlay curves aligned to the current season by calendar day (MM-DD).
-  const normalCumulativeByMonthDay = useMemo(() => {
-    const buckets = new Map<string, { sum: number; count: number }>();
-    for (const baselineSnapshot of baselineSnapshots) {
-      for (const record of baselineSnapshot.records) {
-        const key = record.date.slice(5);
-        const bucket = buckets.get(key) ?? { sum: 0, count: 0 };
-        bucket.sum += record.cumulativeGdd;
-        bucket.count += 1;
-        buckets.set(key, bucket);
-      }
-    }
-    return new Map([...buckets.entries()].map(([key, bucket]) => [key, Number((bucket.sum / bucket.count).toFixed(1))]));
-  }, [baselineSnapshots]);
   const comparisonByMonthDay = useMemo(() => {
     const maps: Record<number, Map<string, number>> = {};
     for (const [yearKey, comparisonSnapshot] of Object.entries(comparisonSnapshotsByYear)) {
@@ -413,8 +427,8 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
     return maps;
   }, [comparisonSnapshotsByYear]);
   const normalDailyGddByMonthDay = useMemo(
-    () => averageDailyGddByMonthDay(baselineWeatherByYear, metricCrop),
-    [baselineWeatherByYear, metricCrop],
+    () => new Map(Object.entries(climatologyByMonthDay ?? {}).map(([key, day]) => [key, day.gddDailyMean])),
+    [climatologyByMonthDay],
   );
 
   // Reference-ETo (atmospheric demand) year-over-year overlays for the ET view,
@@ -422,19 +436,14 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   // from cumulative *reference* ETo rather than crop ETc: ETc rides the Kc/stage
   // curve, whose timing shifts year to year, so ETo isolates the weather-year
   // difference that a "was this a thirstier season" comparison actually wants.
-  const etoNormalCumulativeByMonthDay = useMemo(() => {
-    const buckets = new Map<string, { sum: number; count: number }>();
-    for (const baselineSnapshot of baselineSnapshots) {
-      for (const record of baselineSnapshot.records) {
-        const key = record.date.slice(5);
-        const bucket = buckets.get(key) ?? { sum: 0, count: 0 };
-        bucket.sum += record.cumulativeEtoMm;
-        bucket.count += 1;
-        buckets.set(key, bucket);
-      }
-    }
-    return new Map([...buckets.entries()].map(([key, bucket]) => [key, Number((bucket.sum / bucket.count).toFixed(2))]));
-  }, [baselineSnapshots]);
+  const etoNormalCumulativeByMonthDay = useMemo(
+    () => new Map(Object.entries(climatologyByMonthDay ?? {}).map(([key, day]) => [key, day.etoCumMean])),
+    [climatologyByMonthDay],
+  );
+  const precipNormalCumulativeByMonthDay = useMemo(
+    () => new Map(Object.entries(climatologyByMonthDay ?? {}).map(([key, day]) => [key, day.precipCumMean])),
+    [climatologyByMonthDay],
+  );
   const etoComparisonByMonthDay = useMemo(() => {
     const maps: Record<number, Map<string, number>> = {};
     for (const [yearKey, comparisonSnapshot] of Object.entries(comparisonSnapshotsByYear)) {
@@ -480,14 +489,14 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
     return Object.fromEntries(stageProjections.map((projection) => [projection.label, findThresholdDate(records, projection.thresholdGdd)]));
   }, [comparisonSnapshotsByYear, priorYearForTimeline, stageProjections]);
 
-  const chillSeries = useChillSeries(chillWeatherRecords, settings.chillThresholdMinC, settings.chillThresholdMaxC);
-  const currentChillHours = chillSeries.at(-1)?.cumulativeChillHours ?? 0;
+  const chillSeries = useChillSeries(chillWeatherRecords);
+  const currentChillPortions = chillSeries.at(-1)?.cumulativePortions ?? 0;
   const chillRequirement = cropMetrics.chill.requirement;
-  const chillPercent = chillRequirement ? Math.round((currentChillHours / chillRequirement) * 100) : undefined;
+  const chillPercent = chillRequirement ? Math.round((currentChillPortions / chillRequirement) * 100) : undefined;
 
   // ---- Full calendar-year GDD chart (Jan 1 -> Dec 31) ----
-  // Current season = observed history + forecast; beyond that a dashed
-  // projection extends to year-end using the 5-yr-average daily curve.
+  // Solid current season = observed history; the dashed projection carries the
+  // forecast and, past it, the 30-yr-average daily rate up to the horizon.
   const fullYearDates = useMemo(() => {
     const dates: string[] = [];
     let cursor = new Date(`${currentYear}-01-01T00:00:00Z`);
@@ -505,34 +514,24 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   const actualEndDate = forecastVisible
     ? (lastRecordDate < forecastHorizonDate ? lastRecordDate : forecastHorizonDate)
     : todayIso;
-  const currentByDate = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const record of snapshot.records) {
-      if (record.date <= actualEndDate) map.set(record.date, record.cumulativeGdd);
-    }
-    return map;
-  }, [snapshot.records, actualEndDate]);
+  const weatherByDate = useMemo(() => new Map(weatherRecords.map((record) => [record.date, record])), [weatherRecords]);
 
-  // Hard-capped at the forecast horizon (never year-end): the current-season
-  // projection only fills any gap between the loaded data and today+forecastDays
-  // using the 5-yr-average daily rate. The full-year normal/comparison curves stay
-  // as climatological context, but this season's line does not run to Dec 31.
-  const projectedByDate = useMemo(() => {
-    const map = new Map<string, number>();
-    const cutoff = snapshot.records.filter((record) => record.date <= actualEndDate).at(-1);
-    if (!show.projection || !cutoff || !normalDailyGddByMonthDay.size || cutoff.date >= forecastHorizonDate) return map;
-    let cumulative = cutoff.cumulativeGdd;
-    map.set(cutoff.date, cumulative);
-    let cursor = new Date(`${cutoff.date}T00:00:00Z`);
-    const end = new Date(`${forecastHorizonDate}T00:00:00Z`);
-    while (cursor < end) {
-      cursor = addUtcDays(cursor, 1);
-      const iso = toIsoDate(cursor);
-      cumulative += normalDailyGddByMonthDay.get(iso.slice(5)) ?? 0;
-      map.set(iso, cumulative);
-    }
-    return map;
-  }, [snapshot.records, actualEndDate, show.projection, normalDailyGddByMonthDay, forecastHorizonDate]);
+  // Solid line = observed days only; dashed line = seam + forecast days + (when
+  // enabled) a normal-rate extension to the horizon. gridMET lags ~2 days, so
+  // the split runs on record *source*, not on today's date — the merged records
+  // for today and yesterday are usually forecast-backed and must render dashed.
+  const { currentByDate, projectedByDate } = useMemo(
+    () =>
+      splitSeasonSeries({
+        records: snapshot.records,
+        isForecastDate: (date) => weatherByDate.get(date)?.source === "forecast",
+        actualEndDate,
+        forecastHorizonDate,
+        includeProjection: show.projection,
+        normalDailyGddByMonthDay,
+      }),
+    [snapshot.records, weatherByDate, actualEndDate, forecastHorizonDate, show.projection, normalDailyGddByMonthDay],
+  );
 
   const gddChartData = useMemo(
     () =>
@@ -541,12 +540,19 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         const current = currentByDate.get(date);
         const projected = projectedByDate.get(date);
         const normal = normalCumulativeByMonthDay.get(monthDay);
-        const point: Record<string, string | number | undefined> = {
+        const dayStats = climatologyByMonthDay?.[monthDay];
+        const point: Record<string, string | number | [number, number] | undefined> = {
           date: formatDateLabel(date),
           fullDate: date,
           current: typeof current === "number" ? Number((current * unitFactor).toFixed(1)) : undefined,
           projected: typeof projected === "number" ? Number((projected * unitFactor).toFixed(1)) : undefined,
           normal: typeof normal === "number" ? Number((normal * unitFactor).toFixed(1)) : undefined,
+          // Recharts native range area: a single [low, high] value renders a
+          // band with no invisible-baseline stacking hack.
+          normalRange: dayStats
+            ? ([Number((dayStats.gddCumP10 * unitFactor).toFixed(1)), Number((dayStats.gddCumP90 * unitFactor).toFixed(1))] as [number, number])
+            : undefined,
+          normalP50: dayStats ? Number((dayStats.gddCumP50 * unitFactor).toFixed(1)) : undefined,
         };
         selectedComparisonYears.forEach((year) => {
           const value = comparisonByMonthDay[year]?.get(monthDay);
@@ -554,14 +560,13 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         });
         return point;
       }),
-    [comparisonByMonthDay, currentByDate, fullYearDates, normalCumulativeByMonthDay, projectedByDate, selectedComparisonYears, unitFactor],
+    [climatologyByMonthDay, comparisonByMonthDay, currentByDate, fullYearDates, normalCumulativeByMonthDay, projectedByDate, selectedComparisonYears, unitFactor],
   );
 
   // ---- Daily GDD bars (biofix -> forecast horizon) ----
   // Same date window as the cumulative "current" line, but each point carries the
   // *daily* GDD so it can render as a histogram. Historical vs forecast days are
   // split into separate keys so they can be colored distinctly.
-  const weatherByDate = useMemo(() => new Map(weatherRecords.map((record) => [record.date, record])), [weatherRecords]);
   const gddDailyChartData = useMemo(
     () =>
       snapshot.records
@@ -581,15 +586,20 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
     [snapshot.records, actualEndDate, weatherByDate, unitFactor, normalDailyGddByMonthDay],
   );
 
-  // ---- ET chart (crop water demand, biofix -> forecast horizon) ----
+  // ---- ET chart (crop water demand + precipitation supply, biofix -> forecast horizon) ----
   const etChartData = useMemo(() => {
     let cumulativeEto = 0;
+    let cumulativePrecip = 0;
     return snapshot.records.filter((record) => record.date <= actualEndDate).map((record) => {
       const weather = weatherByDate.get(record.date);
       const isForecast = weather?.source === "forecast";
       const monthDay = record.date.slice(5);
       cumulativeEto += weather?.etoMm ?? 0;
+      cumulativePrecip += weather?.precipMm ?? 0;
+      const dailyPrecip = weather?.precipMm ?? 0;
       const etoNormal = etoNormalCumulativeByMonthDay.get(monthDay);
+      const precipNormal = precipNormalCumulativeByMonthDay.get(monthDay);
+      const dayStats = climatologyByMonthDay?.[monthDay];
       const comparisonEto = Object.fromEntries(
         selectedComparisonYears.map((year) => {
           const value = etoComparisonByMonthDay[year]?.get(monthDay);
@@ -604,7 +614,15 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         cumulativeEt: Number((record.cumulativeEtcMm * etFactor).toFixed(2)),
         cumulativeEto: Number((cumulativeEto * etFactor).toFixed(2)),
         etoNormal: typeof etoNormal === "number" ? Number((etoNormal * etFactor).toFixed(2)) : undefined,
+        etoNormalP10: dayStats ? Number((dayStats.etoCumP10 * etFactor).toFixed(2)) : undefined,
+        etoNormalBandSpan: dayStats ? Number(((dayStats.etoCumP90 - dayStats.etoCumP10) * etFactor).toFixed(2)) : undefined,
         ...comparisonEto,
+        dailyPrecipHistorical: isForecast ? undefined : Number((dailyPrecip * etFactor).toFixed(2)),
+        dailyPrecipForecast: isForecast ? Number((dailyPrecip * etFactor).toFixed(2)) : undefined,
+        cumulativePrecip: Number((cumulativePrecip * etFactor).toFixed(2)),
+        precipNormal: typeof precipNormal === "number" ? Number((precipNormal * etFactor).toFixed(2)) : undefined,
+        precipNormalP10: dayStats ? Number((dayStats.precipCumP10 * etFactor).toFixed(2)) : undefined,
+        precipNormalBandSpan: dayStats ? Number(((dayStats.precipCumP90 - dayStats.precipCumP10) * etFactor).toFixed(2)) : undefined,
         petLow: isForecast && typeof weather?.forecastPetP10Mm === "number" ? Number((weather.forecastPetP10Mm * etFactor).toFixed(2)) : undefined,
         petBand:
           isForecast && typeof weather?.forecastPetP10Mm === "number" && typeof weather?.forecastPetP90Mm === "number"
@@ -612,7 +630,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
             : undefined,
       };
     });
-  }, [snapshot.records, weatherByDate, etFactor, actualEndDate, etoNormalCumulativeByMonthDay, etoComparisonByMonthDay, selectedComparisonYears]);
+  }, [snapshot.records, weatherByDate, etFactor, actualEndDate, etoNormalCumulativeByMonthDay, precipNormalCumulativeByMonthDay, etoComparisonByMonthDay, selectedComparisonYears, climatologyByMonthDay]);
 
   const seasonEtoMm = snapshot.cumulativeEtoMm;
   const observedEtc = snapshot.records.filter((record) => weatherByDate.get(record.date)?.source !== "forecast").at(-1)?.cumulativeEtcMm ?? 0;
@@ -620,16 +638,26 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   const forecastEndEtc = snapshot.records.filter((record) => record.date <= forecastHorizonDate).at(-1)?.cumulativeEtcMm ?? observedEtc;
   const forecastEtcMm = forecastEndEtc - observedEtc;
 
+  // ---- Precipitation summary (mirrors the ET summary above) ----
+  const observedPrecipMm = snapshot.records
+    .filter((record) => record.date <= actualEndDate && weatherByDate.get(record.date)?.source !== "forecast")
+    .reduce((sum, record) => sum + (weatherByDate.get(record.date)?.precipMm ?? 0), 0);
+  const forecastEndPrecipMm = snapshot.records
+    .filter((record) => record.date <= forecastHorizonDate)
+    .reduce((sum, record) => sum + (weatherByDate.get(record.date)?.precipMm ?? 0), 0);
+  const forecastPrecipMm = forecastEndPrecipMm - observedPrecipMm;
+  const normalPrecipToDateMm = precipNormalCumulativeByMonthDay.get(todayIso.slice(5));
+
   // ---- Active chart selection ----
   const gddView = view === "gdd" && gddChartMode === "daily" ? gddDailyChartData : gddChartData;
   const chartData = view === "et" ? etChartData : view === "chill" ? chillSeriesData(chillSeries) : gddView;
 
-  function chillSeriesData(series: ReturnType<typeof cumulativeChillHours>) {
+  function chillSeriesData(series: ReturnType<typeof cumulativeChillPortions>) {
     return series.map((record) => ({
       date: formatDateLabel(record.date),
       fullDate: record.date,
-      daily: record.chillHours,
-      current: record.cumulativeChillHours,
+      daily: record.dailyPortions,
+      current: record.cumulativePortions,
     }));
   }
 
@@ -662,7 +690,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
 
   function formatEt(valueMm: number | undefined): string {
     if (typeof valueMm !== "number") return "--";
-    return `${(valueMm * etFactor).toFixed(settings.etUnit === "in" ? 1 : 0)} ${etLabel}`;
+    return `${(valueMm * etFactor).toFixed(etUnit === "in" ? 1 : 0)} ${etLabel}`;
   }
 
   function formatStageDate(projection: { status: string; date?: string } | undefined): string {
@@ -672,7 +700,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   }
 
   function handleExportCsv() {
-    const chillByDate = new Map(chillSeries.map((record) => [record.date, record.cumulativeChillHours]));
+    const chillByDate = new Map(chillSeries.map((record) => [record.date, record.cumulativePortions]));
     const tempSuffix = tempUnitSuffix(unitSystem);
     const columns = [
       { key: "date", label: "Date" },
@@ -681,20 +709,24 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
       { key: "tmax", label: `Tmax (${tempSuffix})` },
       { key: "dailyGdd", label: `Daily ${unitLabel}` },
       { key: "cumulativeGdd", label: `Cumulative ${unitLabel}` },
-      { key: "normalGdd", label: `5-yr Normal Cumulative ${unitLabel}` },
+      { key: "normalGdd", label: `30-yr Normal Cumulative ${unitLabel}` },
       { key: "etcMm", label: `Crop ET (${etLabel})` },
       { key: "etoMm", label: `Reference ETo (${etLabel})` },
-      { key: "etoNormal", label: `5-yr Normal Cumulative Reference ETo (${etLabel})` },
+      { key: "etoNormal", label: `30-yr Normal Cumulative Reference ETo (${etLabel})` },
+      { key: "precip", label: `Precipitation (${etLabel})` },
+      { key: "cumulativePrecip", label: `Cumulative Precipitation (${etLabel})` },
       ...selectedComparisonYears.map((year) => ({ key: `year${year}`, label: `${year} Cumulative ${unitLabel}` })),
       ...selectedComparisonYears.map((year) => ({ key: `year${year}Eto`, label: `${year} Cumulative Reference ETo (${etLabel})` })),
-      ...(cropMetrics.chill.enabled ? [{ key: "chill", label: "Cumulative Chill Hours" }] : []),
+      ...(cropMetrics.chill.enabled ? [{ key: "chill", label: "Cumulative Chill Portions" }] : []),
     ];
 
+    let cumulativePrecipMm = 0;
     const rows = snapshot.records.map((record) => {
       const monthDay = record.date.slice(5);
       const weather = weatherByDate.get(record.date);
       const normal = normalCumulativeByMonthDay.get(monthDay);
       const etoNormal = etoNormalCumulativeByMonthDay.get(monthDay);
+      cumulativePrecipMm += weather?.precipMm ?? 0;
       const row: Record<string, string | number | undefined> = {
         date: record.date,
         source: weather?.source ?? "historical",
@@ -706,6 +738,8 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         etcMm: Number((record.etcMm * etFactor).toFixed(2)),
         etoMm: typeof weather?.etoMm === "number" ? Number((weather.etoMm * etFactor).toFixed(2)) : undefined,
         etoNormal: typeof etoNormal === "number" ? Number((etoNormal * etFactor).toFixed(2)) : undefined,
+        precip: typeof weather?.precipMm === "number" ? Number((weather.precipMm * etFactor).toFixed(2)) : undefined,
+        cumulativePrecip: Number((cumulativePrecipMm * etFactor).toFixed(2)),
         chill: chillByDate.get(record.date),
       };
       selectedComparisonYears.forEach((year) => {
@@ -717,8 +751,30 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
       return row;
     });
 
-    const slug = field.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "field";
-    downloadCsv(`${slug}-${view}-${todayIso}.csv`, columns, rows);
+    downloadCsv(`${fileSlug}-${view}-${todayIso}.csv`, columns, rows);
+  }
+
+  // Renders the graph card (title + chart + legend) to a PNG. The interactive
+  // controls are excluded via the filter so the image is presentation-ready.
+  async function handleExportImage() {
+    const node = chartPanelRef.current;
+    if (!node) return;
+    setExportingImage(true);
+    try {
+      const dataUrl = await toPng(node, {
+        pixelRatio: 2,
+        backgroundColor: "#ffffff",
+        filter: (el) =>
+          !(el instanceof HTMLElement) ||
+          !(el.classList.contains("segmented") || el.classList.contains("inline-controls") || el.classList.contains("legend-info")),
+      });
+      const link = document.createElement("a");
+      link.download = `${fileSlug}-${view}-${todayIso}.png`;
+      link.href = dataUrl;
+      link.click();
+    } finally {
+      setExportingImage(false);
+    }
   }
 
   const forecastAvailable = forecastWeatherRecords.length > 0 && forecastDays > 0;
@@ -750,7 +806,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   if (view === "gdd" && gddChartMode === "daily") {
     legendItems.push({
       label: "Daily GDD",
-      color: "#061827",
+      color: GDD_CURRENT_COLOR,
       source: "Growing degree days accumulated each day from gridMET daily min/max air temperature.",
     });
     if (forecastVisible)
@@ -759,34 +815,40 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         color: "#d29b4e",
         source: "Daily GDD projected from the Climate Toolbox CFS forecast across the selected window.",
       });
-    if (show.fiveYearNormal)
+    if (show.climatologyNormal)
       legendItems.push({
-        label: "5-yr Avg (daily)",
-        color: "#934936",
+        label: "Historical (30 year average, daily)",
+        color: GDD_NORMAL_COLOR,
         dashed: true,
-        source: "Average daily GDD on each calendar day across the previous five seasons of gridMET temperatures.",
+        source: "Average daily GDD on each calendar day across the previous 30 seasons of gridMET temperatures.",
       });
   } else if (view === "gdd") {
     if (show.currentSeason)
       legendItems.push({
-        label: "Current Season",
-        color: "#061827",
+        label: "Current Year (observed)",
+        color: GDD_CURRENT_COLOR,
         source:
           "Growing degree days accumulated from gridMET daily min/max air temperature, using the averaging method capped at the crop's base and upper thresholds.",
       });
-    if (show.projection)
+    if (show.projection || forecastVisible)
       legendItems.push({
-        label: "Projected",
-        color: "#061827",
+        label: "Forecast",
+        color: GDD_CURRENT_COLOR,
         dashed: true,
-        source: "GDD projected to the end of the forecast window (capped at the selected forecast range) using the 5-year average daily accumulation rate.",
+        source:
+          "Dashed continuation of the season line from the last observed day: Climate Toolbox CFS forecast GDD through the selected window, extended at the 30-year average daily accumulation rate where the forecast runs out.",
       });
-    if (show.fiveYearNormal)
+    if (show.climatologyNormal)
       legendItems.push({
-        label: "5-yr Average",
-        color: "#934936",
-        dashed: true,
-        source: "Average cumulative GDD on each calendar day across the previous five seasons of gridMET temperatures.",
+        label: "Historical (30 year average)",
+        color: GDD_NORMAL_COLOR,
+        source: "Average cumulative GDD on each calendar day across the previous 30 seasons of gridMET temperatures.",
+      });
+    if (show.climatologyBand)
+      legendItems.push({
+        label: "30-yr P10–P90 band",
+        color: GDD_NORMAL_BAND_COLOR,
+        source: "The middle 80% of cumulative-GDD outcomes across the previous 30 seasons, with the median (P50) as a fine dotted line — context for how unusual this season is.",
       });
     if (show.selectedYears)
       selectedComparisonYears.forEach((year, index) =>
@@ -796,46 +858,16 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
           source: `Cumulative GDD for the ${year} season from gridMET historical temperatures.`,
         }),
       );
-    if (show.stages)
-      legendItems.push({
-        label: "Stage",
-        color: "#4a7c59",
-        dashed: true,
-        source: "Growth-stage GDD thresholds from the selected crop's phenology profile.",
-      });
   } else if (view === "chill") {
     legendItems.push({ label: "Current Chill", color: "#061827" });
     if (chillRequirement) legendItems.push({ label: "Chill Target", color: "#4a7c59", dashed: true });
-  } else {
-    if (show.etCumulative)
-      legendItems.push({
-        label: "Crop ET (cumulative)",
-        color: "#061827",
-        source:
-          "Cumulative crop ET (ETc): OpenET satellite actual ET when available, otherwise reference ETo \u00d7 the crop coefficient (Kc) for the current growth stage.",
-      });
-    if (show.referenceEt)
-      legendItems.push({
-        label: "Reference ETo (this year)",
-        color: "#934936",
-        dashed: true,
-        source: "Cumulative grass-reference ET (ETo) \u2014 atmospheric demand \u2014 for the current season from gridMET history and the Climate Toolbox forecast.",
-      });
-    if (show.etReferencePriorYear)
-      selectedComparisonYears.forEach((year, index) =>
-        legendItems.push({
-          label: `Reference ETo (${year})`,
-          color: etoComparisonYearColor(index),
-          source: `Cumulative grass-reference ET (ETo) for the ${year} season from gridMET history \u2014 a same-field, year-over-year atmospheric-demand comparison, aligned to this season by calendar day.`,
-        }),
-      );
-    if (show.etReferenceNormal)
-      legendItems.push({
-        label: "Reference ETo (5-yr avg)",
-        color: ETO_NORMAL_COLOR,
-        dashed: true,
-        source: "Average cumulative grass-reference ET (ETo) on each calendar day across the previous five seasons of gridMET history \u2014 the \u201cnormal\u201d atmospheric demand for this field.",
-      });
+  } else if (etChartMode === "cropEt") {
+    legendItems.push({
+      label: "Crop ET (cumulative)",
+      color: "#061827",
+      source:
+        "Cumulative crop ET (ETc): OpenET satellite actual ET when available, otherwise reference ETo \u00d7 the crop coefficient (Kc) for the current growth stage.",
+    });
     if (show.etDailyBars) {
       legendItems.push({
         label: "Daily ET",
@@ -849,6 +881,66 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
           source: "Daily crop ET projected from the Climate Toolbox CFS forecast.",
         });
     }
+  } else if (etChartMode === "referenceEt") {
+    legendItems.push({
+      label: "Reference ETo (this year)",
+      color: "#934936",
+      dashed: true,
+      source: "Cumulative grass-reference ET (ETo) \u2014 atmospheric demand \u2014 for the current season from gridMET history and the Climate Toolbox forecast.",
+    });
+    if (show.etReferencePriorYear)
+      selectedComparisonYears.forEach((year, index) =>
+        legendItems.push({
+          label: `Reference ETo (${year})`,
+          color: etoComparisonYearColor(index),
+          source: `Cumulative grass-reference ET (ETo) for the ${year} season from gridMET history \u2014 a same-field, year-over-year atmospheric-demand comparison, aligned to this season by calendar day.`,
+        }),
+      );
+    if (show.etReferenceNormal)
+      legendItems.push({
+        label: "Reference ETo (30-yr avg)",
+        color: ETO_NORMAL_COLOR,
+        dashed: true,
+        source: "Average cumulative grass-reference ET (ETo) on each calendar day across the previous 30 seasons of gridMET history \u2014 the \u201cnormal\u201d atmospheric demand for this field.",
+      });
+    if (show.climatologyBand)
+      legendItems.push({
+        label: "30-yr ETo P10\u2013P90 band",
+        color: "#c5d2de",
+        source: "The middle 80% of cumulative reference-ETo outcomes across the previous 30 seasons.",
+      });
+  } else {
+    legendItems.push({
+      label: "Cumulative precipitation",
+      color: "#061827",
+      source: "Season-to-date precipitation accumulated from gridMET daily totals, extended with the Climate Toolbox CFS forecast.",
+    });
+    if (show.precipDailyBars) {
+      legendItems.push({
+        label: "Daily precipitation",
+        color: "#3f6486",
+        source: "Daily precipitation totals from gridMET history.",
+      });
+      if (forecastVisible)
+        legendItems.push({
+          label: "Daily precipitation (forecast)",
+          color: "#d29b4e",
+          source: "Daily precipitation from the Climate Toolbox CFS forecast (ensemble median).",
+        });
+    }
+    if (show.precipNormal)
+      legendItems.push({
+        label: "Precipitation (30-yr avg)",
+        color: PRECIP_NORMAL_COLOR,
+        dashed: true,
+        source: "Average cumulative precipitation on each calendar day across the previous 30 seasons of gridMET history — the “normal” water supply for this field.",
+      });
+    if (show.precipBand)
+      legendItems.push({
+        label: "30-yr precipitation P10–P90 band",
+        color: "#c9dbe3",
+        source: "The middle 80% of cumulative precipitation outcomes across the previous 30 seasons — the spread between dry and wet years.",
+      });
   }
 
   const renderStageLabels = (rcProps: {
@@ -860,11 +952,15 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   const viewSubtitle =
     view === "gdd"
       ? gddChartMode === "daily"
-        ? `${cropDisplayName} daily GDD accumulation this season, with the 5-yr average`
-        : `${cropDisplayName} cumulative GDD across ${currentYear}, with last year and the 5-yr average`
+        ? `${cropDisplayName} daily GDD accumulation this season, with the 30-yr average`
+        : `${cropDisplayName} cumulative GDD across ${currentYear}, with last year and the 30-yr normal`
       : view === "chill"
         ? `${cropDisplayName} cumulative chill hours this dormant season`
-        : `${cropDisplayName} crop water demand (ET) for the season, with reference ETo and prior-year comparison`;
+        : etChartMode === "cropEt"
+          ? `${cropDisplayName} crop water demand (ETc) for the season`
+          : etChartMode === "referenceEt"
+            ? `Reference ETo (atmospheric demand) for the season, with prior-year comparison`
+            : `Season-to-date precipitation for this field, from gridMET history and the CFS forecast`;
 
   const metricCards =
     view === "gdd"
@@ -877,18 +973,18 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
             info: `Cumulative GDD to date between the ${celsiusToDisplayTemp(metricCrop.tBaseC, unitSystem)}${tempUnitSuffix(unitSystem)} base and ${celsiusToDisplayTemp(metricCrop.tUpperC, unitSystem)}${tempUnitSuffix(unitSystem)} upper thresholds from the ${formatDateLabel(selectedStartDate)} biofix.`,
           },
           {
-            label: "5-yr Average",
+            label: "30-yr Average",
             value: typeof normalToDateC === "number" ? `${formatGdd(normalToDateC)} ${unitLabel}` : "Pending",
             detail: "Average to date",
             icon: Gauge,
-            info: "Average cumulative GDD on today's date across the prior five seasons.",
+            info: "Average cumulative GDD on today's date across the prior 30 seasons.",
           },
           {
             label: "Difference",
             value: typeof gddVsNormalC === "number" ? `${gddVsNormalC >= 0 ? "+" : "-"}${formatGdd(Math.abs(gddVsNormalC))} ${unitLabel}` : "Pending",
-            detail: typeof daysVsNormal === "number" ? `${Math.abs(daysVsNormal)} days ${daysVsNormal >= 0 ? "ahead" : "behind"}` : "vs 5-yr average",
+            detail: typeof daysVsNormal === "number" ? `${Math.abs(daysVsNormal)} days ${daysVsNormal >= 0 ? "ahead" : "behind"}` : "vs 30-yr average",
             icon: CalendarClock,
-            info: "Current-season GDD minus the 5-yr average for today, with the equivalent days ahead or behind.",
+            info: "Current-season GDD minus the 30-yr average for today, with the equivalent days ahead or behind.",
           },
           {
             label: "Forecast",
@@ -902,17 +998,17 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         ? [
             {
               label: "Chill Accrued",
-              value: chillWeatherRecords.length ? `${Math.round(currentChillHours).toLocaleString()} hrs` : "Pending",
+              value: chillWeatherRecords.length ? `${currentChillPortions.toFixed(1)} CP` : "Pending",
               detail: chillSeasonStart ? `Since ${formatDateLabel(chillSeasonStart)}` : "Dormant season",
               icon: ThermometerSun,
-              info: `Cumulative hours between ${settings.chillThresholdMinC}°C and ${settings.chillThresholdMaxC}°C this dormant season.`,
+              info: "Cumulative Chill Portions from the Dynamic Model (Fishman–Erez), computed on hourly temperatures this dormant season.",
             },
             {
               label: "Requirement",
-              value: chillRequirement ? `${chillRequirement.toLocaleString()} hrs` : "n/a",
+              value: chillRequirement ? `${chillRequirement.toLocaleString()} CP` : "n/a",
               detail: "Crop chill need",
               icon: Gauge,
-              info: "Approximate chill-hour requirement for this crop profile.",
+              info: "Approximate Chill Portion requirement for this crop profile.",
             },
             {
               label: "Progress",
@@ -920,6 +1016,30 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
               detail: "Toward requirement",
               icon: CalendarClock,
               info: "Share of the crop's chill requirement accumulated so far.",
+            },
+          ]
+        : etChartMode === "precip"
+        ? [
+            {
+              label: "Season Precip",
+              value: snapshot.records.length ? formatEt(observedPrecipMm) : "Pending",
+              detail: "Water supplied to date",
+              icon: Droplets,
+              info: "Cumulative precipitation to date, accumulated from gridMET daily totals over the season window.",
+            },
+            {
+              label: "30-yr Avg Precip",
+              value: typeof normalPrecipToDateMm === "number" ? formatEt(normalPrecipToDateMm) : "Pending",
+              detail: "Average to date",
+              icon: Gauge,
+              info: "Average cumulative precipitation on today's date across the prior 30 seasons of gridMET history.",
+            },
+            {
+              label: "Forecast Precip",
+              value: forecastAvailable ? `+${formatEt(forecastPrecipMm)}` : "Unavailable",
+              detail: forecastAvailable ? `Next ${forecastDays} days` : "No forecast loaded",
+              icon: Sprout,
+              info: "Precipitation expected across the forecast window beyond today, from the Climate Toolbox CFS forecast.",
             },
           ]
         : [
@@ -954,16 +1074,6 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         <div>
           <div className="heading-row">
             <h1>Growing Season Insights</h1>
-            <span className="season-badge">{currentYear}</span>
-            <span className="data-source-badge">
-              {historicalWeatherRecords.length
-                ? forecastAvailable
-                  ? `Live weather + ${forecastDays}-day forecast`
-                  : "Live weather"
-                : weatherLoading
-                  ? "Loading weather"
-                  : "Weather unavailable"}
-            </span>
           </div>
           <p>
             {field.name} - {field.cropLabel}
@@ -975,6 +1085,10 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
             <Download size={18} />
             Export Data
           </button>
+          <button className="primary-button" type="button" onClick={handleExportImage} disabled={!chartData.length || exportingImage}>
+            <ImageIcon size={18} />
+            {exportingImage ? "Exporting…" : "Export Image"}
+          </button>
         </div>
       </div>
 
@@ -985,10 +1099,11 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
       </section>
 
       <section className="dashboard-grid">
-        <section className="panel chart-panel">
+        <section className="panel chart-panel" ref={chartPanelRef}>
           <div className="panel-title-row">
             <div>
-              <h2>Crop Metrics Tracker</h2>
+              <h2>{field.name} — {field.cropLabel}</h2>
+              <p className="chart-location">{formatLatLon(field.lat, field.lon)}</p>
               <p>{viewSubtitle}</p>
             </div>
             <div className="segmented">
@@ -1011,6 +1126,8 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
             chillRequirement={chillRequirement}
             gddChartMode={gddChartMode}
             onGddChartModeChange={setGddChartMode}
+            etChartMode={etChartMode}
+            onEtChartModeChange={setEtChartMode}
             onOpenAdvanced={() => setAdvancedOpen(true)}
           />
 
@@ -1030,32 +1147,50 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                           dailyEtForecast: "Daily ET (forecast)",
                           cumulativeEt: "Crop ET",
                           cumulativeEto: "Reference ETo (this year)",
-                          etoNormal: "Reference ETo (5-yr avg)",
+                          etoNormal: "Reference ETo (30-yr avg)",
+                          dailyPrecipHistorical: "Daily precipitation",
+                          dailyPrecipForecast: "Daily precipitation (forecast)",
+                          cumulativePrecip: "Cumulative precipitation",
+                          precipNormal: "Precipitation (30-yr avg)",
                         };
                         selectedComparisonYears.forEach((year) => {
                           labels[`year${year}Eto`] = `Reference ETo (${year})`;
                         });
-                        if (name === "petLow" || name === "petBand") return ["", ""] as [string, string];
+                        if (
+                          name === "petLow" ||
+                          name === "petBand" ||
+                          name === "etoNormalP10" ||
+                          name === "etoNormalBandSpan" ||
+                          name === "precipNormalP10" ||
+                          name === "precipNormalBandSpan"
+                        )
+                          return ["", ""] as [string, string];
                         return [`${Number(value).toFixed(2)} ${etLabel}`, labels[String(name)] ?? String(name)];
                       }}
                       labelFormatter={(label) => etChartData.find((point) => point.date === label)?.fullDate ?? label}
                     />
-                    {show.forecastBand ? (
+                    {etChartMode === "cropEt" && show.forecastBand ? (
                       <>
                         <Area yAxisId="daily" type="monotone" dataKey="petLow" stackId="pet" stroke="none" fill="none" />
                         <Area yAxisId="daily" type="monotone" dataKey="petBand" stackId="pet" stroke="none" fill="#d29b4e" fillOpacity={0.18} />
                       </>
                     ) : null}
-                    {show.etDailyBars ? (
+                    {etChartMode === "cropEt" && show.etDailyBars ? (
                       <>
                         <Bar yAxisId="daily" dataKey="dailyEtHistorical" fill="#4a7c59" barSize={6} />
                         <Bar yAxisId="daily" dataKey="dailyEtForecast" fill="#d29b4e" fillOpacity={0.92} barSize={6} />
                       </>
                     ) : null}
-                    {show.etReferenceNormal ? (
+                    {etChartMode === "referenceEt" && show.climatologyBand ? (
+                      <>
+                        <Area yAxisId="cumulative" type="monotone" dataKey="etoNormalP10" stackId="etoNormalBand" stroke="none" fill="none" connectNulls />
+                        <Area yAxisId="cumulative" type="monotone" dataKey="etoNormalBandSpan" stackId="etoNormalBand" stroke="none" fill={ETO_NORMAL_COLOR} fillOpacity={0.12} connectNulls />
+                      </>
+                    ) : null}
+                    {etChartMode === "referenceEt" && show.etReferenceNormal ? (
                       <Line yAxisId="cumulative" type="monotone" dataKey="etoNormal" stroke={ETO_NORMAL_COLOR} strokeDasharray="5 4" dot={false} strokeWidth={1.8} strokeOpacity={0.85} connectNulls />
                     ) : null}
-                    {show.etReferencePriorYear
+                    {etChartMode === "referenceEt" && show.etReferencePriorYear
                       ? selectedComparisonYears.map((year, index) => (
                           <Line
                             key={`eto-${year}`}
@@ -1070,11 +1205,31 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                           />
                         ))
                       : null}
-                    {show.referenceEt ? (
+                    {etChartMode === "referenceEt" ? (
                       <Line yAxisId="cumulative" type="monotone" dataKey="cumulativeEto" stroke="#934936" strokeDasharray="6 5" dot={false} strokeWidth={2} />
                     ) : null}
-                    {show.etCumulative ? (
+                    {etChartMode === "cropEt" ? (
                       <Line yAxisId="cumulative" type="monotone" dataKey="cumulativeEt" stroke="#061827" dot={false} strokeWidth={3} />
+                    ) : null}
+                    {etChartMode === "precip" && show.precipBand ? (
+                      <>
+                        <Area yAxisId="cumulative" type="monotone" dataKey="precipNormalP10" stackId="precipNormalBand" stroke="none" fill="none" connectNulls />
+                        <Area yAxisId="cumulative" type="monotone" dataKey="precipNormalBandSpan" stackId="precipNormalBand" stroke="none" fill={PRECIP_NORMAL_COLOR} fillOpacity={0.12} connectNulls />
+                      </>
+                    ) : null}
+                    {etChartMode === "precip" && show.precipNormal ? (
+                      <Line yAxisId="cumulative" type="monotone" dataKey="precipNormal" stroke={PRECIP_NORMAL_COLOR} strokeDasharray="5 4" dot={false} strokeWidth={1.8} strokeOpacity={0.85} connectNulls />
+                    ) : null}
+                    {etChartMode === "precip" ? (
+                      <>
+                        {show.precipDailyBars ? (
+                          <>
+                            <Bar yAxisId="daily" dataKey="dailyPrecipHistorical" fill="#3f6486" barSize={6} />
+                            <Bar yAxisId="daily" dataKey="dailyPrecipForecast" fill="#d29b4e" fillOpacity={0.92} barSize={6} />
+                          </>
+                        ) : null}
+                        <Line yAxisId="cumulative" type="monotone" dataKey="cumulativePrecip" stroke="#061827" dot={false} strokeWidth={3} />
+                      </>
                     ) : null}
                     {etForecastRegionVisible ? (
                       <ReferenceLine
@@ -1114,16 +1269,16 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                         const labels: Record<string, string> = {
                           dailyGddHistorical: "Daily GDD",
                           dailyGddForecast: "Daily GDD (forecast)",
-                          normalDaily: "5-yr Avg (daily)",
+                          normalDaily: "30-yr Avg (daily)",
                         };
                         return [`${Number(value).toFixed(1)} ${unitLabel}`, labels[String(name)] ?? String(name)];
                       }}
                       labelFormatter={(label) => gddDailyChartData.find((point) => point.date === label)?.fullDate ?? label}
                     />
-                    <Bar dataKey="dailyGddHistorical" fill="#061827" barSize={4} />
+                    <Bar dataKey="dailyGddHistorical" fill={GDD_CURRENT_COLOR} barSize={4} />
                     {forecastVisible ? <Bar dataKey="dailyGddForecast" fill="#d29b4e" barSize={4} /> : null}
-                    {show.fiveYearNormal ? (
-                      <Line type="monotone" dataKey="normalDaily" stroke="#934936" strokeDasharray="6 5" dot={false} strokeWidth={2} strokeOpacity={0.9} connectNulls />
+                    {show.climatologyNormal ? (
+                      <Line type="monotone" dataKey="normalDaily" stroke={GDD_NORMAL_COLOR} dot={false} strokeWidth={2} strokeOpacity={0.9} connectNulls />
                     ) : null}
                     <ReferenceLine x={todayLabel} stroke="#687078" strokeDasharray="2 4" strokeOpacity={0.7} />
                   </ComposedChart>
@@ -1147,7 +1302,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                       tickMargin={8}
                       tick={{ fontSize: 12 }}
                       label={{
-                        value: view === "gdd" ? `Cumulative ${unitLabel}` : "Cumulative Chill Hours",
+                        value: view === "gdd" ? `Cumulative ${unitLabel}` : "Cumulative Chill Portions",
                         angle: -90,
                         position: "insideLeft",
                         offset: 2,
@@ -1163,18 +1318,26 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                       formatter={(value, name) => {
                         const labels: Record<string, string> = {
                           current: view === "gdd" ? "Current Season" : "Current Chill",
-                          projected: "Projected",
-                          normal: "5-yr Average",
+                          projected: "Forecast",
+                          normal: "30-yr Average",
+                          normalP50: "30-yr Median (P50)",
                         };
                         comparisonYears.forEach((year) => {
                           labels[`year${year}`] = `${year}`;
                         });
+                        if (name === "normalRange") return ["", ""] as [string, string];
                         return [`${Number(value).toFixed(1)}`, labels[String(name)] ?? String(name)];
                       }}
                       labelFormatter={(label) => chartData.find((point) => point.date === label)?.fullDate ?? label}
                     />
-                    {view === "gdd" && show.fiveYearNormal ? (
-                      <Line yAxisId="cumulative" type="monotone" dataKey="normal" stroke="#934936" strokeDasharray="6 5" dot={false} strokeWidth={2} />
+                    {view === "gdd" && show.climatologyBand ? (
+                      <Area yAxisId="cumulative" type="monotone" dataKey="normalRange" stroke="none" fill={GDD_NORMAL_BAND_COLOR} fillOpacity={0.55} isAnimationActive={false} connectNulls />
+                    ) : null}
+                    {view === "gdd" && show.climatologyBand ? (
+                      <Line yAxisId="cumulative" type="monotone" dataKey="normalP50" stroke={GDD_NORMAL_COLOR} strokeDasharray="2 4" dot={false} strokeWidth={1.3} strokeOpacity={0.6} connectNulls />
+                    ) : null}
+                    {view === "gdd" && show.climatologyNormal ? (
+                      <Line yAxisId="cumulative" type="monotone" dataKey="normal" stroke={GDD_NORMAL_COLOR} dot={false} strokeWidth={2} />
                     ) : null}
                     {view === "gdd" && show.stages
                       ? stageReferenceGroups.map((stage) => (
@@ -1196,11 +1359,11 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                           />
                         ))
                       : null}
-                    {view === "gdd" && show.projection ? (
-                      <Line yAxisId="cumulative" type="monotone" dataKey="projected" stroke="#061827" strokeDasharray="5 5" dot={false} strokeWidth={2} strokeOpacity={0.7} connectNulls />
+                    {view === "gdd" ? (
+                      <Line yAxisId="cumulative" type="monotone" dataKey="projected" stroke={GDD_CURRENT_COLOR} strokeDasharray="5 5" dot={false} strokeWidth={3} connectNulls />
                     ) : null}
                     {(view === "gdd" ? show.currentSeason : true) ? (
-                      <Line yAxisId="cumulative" type="monotone" dataKey="current" stroke="#061827" dot={show.dataMarkers} strokeWidth={3} connectNulls />
+                      <Line yAxisId="cumulative" type="monotone" dataKey="current" stroke={GDD_CURRENT_COLOR} dot={show.dataMarkers} strokeWidth={3} connectNulls />
                     ) : null}
                     {view === "gdd" ? <ReferenceLine yAxisId="cumulative" x={todayLabel} stroke="#687078" strokeDasharray="2 4" strokeOpacity={0.7} /> : null}
                     {view === "chill" && chillRequirement ? (
@@ -1210,7 +1373,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                         stroke="#4a7c59"
                         strokeDasharray="3 5"
                         strokeOpacity={0.75}
-                        label={(props) => <StageReferenceLabel {...props} value="Chill target" detail={`${chillRequirement.toLocaleString()} hrs`} dy={-8} />}
+                        label={(props) => <StageReferenceLabel {...props} value="Chill target" detail={`${chillRequirement.toLocaleString()} CP`} dy={-8} />}
                       />
                     ) : null}
                     {overlayLabelItems.length ? <Customized component={renderStageLabels} /> : null}
@@ -1300,7 +1463,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
             </table>
             )}
             <p className="stage-timeline-footnote">
-              Projected dates use the 28-day forecast, then extend along the average accumulation of the past five seasons. Prior-year dates apply the same
+              Projected dates use the 28-day forecast, then extend along the average accumulation of the past 30 seasons. Prior-year dates apply the same
               thresholds and biofix month-day to that year's weather.
               {nextStageProjection?.date ? ` Next up: ${nextStage?.label} ~${formatDateLabel(nextStageProjection.date)}.` : ""}
             </p>

@@ -73,6 +73,9 @@ export function useSeasonWeather(params: SeasonWeatherParams) {
         if (availableThrough) {
           warnings.push(`gridMET history is available through ${availableThrough} (the most recent days typically lag by ~2 days).`);
         }
+        if (historicalResult.value.metadata.qualityFlags?.includes("missing-variable:pr")) {
+          warnings.push("gridMET precipitation was unavailable — the precipitation view will show zeros for historical days.");
+        }
       } else if (gridMetApi.enabled) {
         warnings.push(historicalResult.reason instanceof Error ? historicalResult.reason.message : "gridMET historical weather could not be loaded.");
         debugDataSource("gridmet", "historical weather request failed", { fieldId, error: String(historicalResult.reason) });
@@ -147,7 +150,7 @@ export interface YearWeatherResult {
   isFetching: boolean;
 }
 
-// Per-year history (temps + reference ET) for the comparison + 5-yr-normal
+// Per-year history (temps + reference ET) for the comparison-year
 // overlays — temps drive the GDD overlays, reference ETo drives the ET overlays.
 // One cached query per year, so toggling which years are shown never
 // refetches a year already loaded this session. Prior years get a long TTL
