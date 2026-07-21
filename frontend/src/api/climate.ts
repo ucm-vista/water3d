@@ -7,6 +7,10 @@ import { kelvinToCelsius, normalizeDate, percentile, toNumber } from "./toolboxS
 
 type ClimateForecastVariable = "pet" | "tmmx" | "tmmn" | "pr" | "sph" | "vpd";
 
+// The 48-member ensemble extraction is slow like gridMET's netCDF pulls and
+// shares the proxy with them, so the 20s fetch default aborts real responses.
+const CFS_TIMEOUT_MS = 60_000;
+
 // Verified against the live service (2026-06): PET and precip arrive as running
 // totals from the forecast start; the other variables are true daily values.
 const CUMULATIVE_FORECAST_VARIABLES: Record<ClimateForecastVariable, boolean> = {
@@ -219,7 +223,7 @@ export class ClimateToolboxProvider {
     url.searchParams.set("lat", String(location.lat));
     url.searchParams.set("lon", String(location.lon));
 
-    const response = await fetchWithTimeout(url.toString());
+    const response = await fetchWithTimeout(url.toString(), {}, CFS_TIMEOUT_MS);
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
       throw new Error(`Climate Toolbox ${variable} forecast request failed with ${response.status}${detail ? `: ${detail.slice(0, 240)}` : ""}.`);
