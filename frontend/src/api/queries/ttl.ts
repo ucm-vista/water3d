@@ -18,6 +18,9 @@ export const TTL = {
   seasonWeather: 6 * HOUR,
   // Open-Meteo chill history runs through today, so refresh a couple times a day.
   chillWeather: 12 * HOUR,
+  // Precomputed chill: the observed season file extends daily, the normal band is
+  // static — a half-day refresh keeps the observed tail current without churn.
+  chillClimatology: 12 * HOUR,
   // Prior full calendar years are immutable once published.
   priorYearWeather: 30 * DAY,
   // The 30-yr climatology window only shifts at year boundaries.

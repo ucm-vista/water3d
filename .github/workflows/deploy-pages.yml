@@ -33,6 +33,15 @@ jobs:
         working-directory: frontend
       - run: npm run build -- --base=/water3d/
         working-directory: frontend
+        # No proxy on GitHub Pages — call every upstream directly. Open-Meteo,
+        # Esri, and Nominatim send CORS headers; the two Idaho services
+        # (gridMET, CFS) currently do NOT, so those requests will be blocked by
+        # the browser until NKN enables CORS or a proxy fronts them.
+        env:
+          VITE_GRIDMET_PROXY_BASE_URL: https://toolbox-webservices.nkn.uidaho.edu
+          VITE_CLIMATE_TOOLBOX_ENABLED: "true"
+          VITE_CLIMATE_TOOLBOX_CFS_PROXY_BASE_URL: https://climate-dev.nkn.uidaho.edu
+          VITE_OPEN_METEO_ARCHIVE_PROXY_BASE_URL: https://archive-api.open-meteo.com
       - uses: actions/upload-pages-artifact@v3
         with:
           path: frontend/dist

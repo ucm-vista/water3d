@@ -1,13 +1,11 @@
 import { SlidersHorizontal } from "lucide-react";
-import { celsiusToDisplayTemp, displayTempToCelsius, tempUnitSuffix } from "../utils/units";
-import { useUnits } from "../state/UnitsContext";
 import { UnitToggle } from "./UnitToggle";
 import type { GraphSettings } from "./graphSettings";
 
 export type MetricView = "gdd" | "chill" | "et";
 export type GddChartMode = "cumulative" | "daily";
-// ET-view sub-mode: crop water demand, reference/atmospheric demand, or water
-// supply (precipitation). One curve family at a time keeps the chart legible.
+// Retained for persisted preferences only. The ET view is now a single combined
+// water-balance chart (crop ET vs precipitation), not a set of sub-modes.
 export type EtChartMode = "cropEt" | "referenceEt" | "precip";
 
 interface InlineMetricControlsProps {
@@ -17,8 +15,6 @@ interface InlineMetricControlsProps {
   chillRequirement?: number;
   gddChartMode: GddChartMode;
   onGddChartModeChange: (mode: GddChartMode) => void;
-  etChartMode: EtChartMode;
-  onEtChartModeChange: (mode: EtChartMode) => void;
   onOpenAdvanced: () => void;
 }
 
@@ -33,17 +29,8 @@ export function InlineMetricControls({
   chillRequirement,
   gddChartMode,
   onGddChartModeChange,
-  etChartMode,
-  onEtChartModeChange,
   onOpenAdvanced,
 }: InlineMetricControlsProps) {
-  const { unitSystem } = useUnits();
-  const tempSuffix = tempUnitSuffix(unitSystem);
-
-  function patch(next: Partial<GraphSettings>) {
-    onChange({ ...settings, ...next });
-  }
-
   return (
     <div className="inline-controls">
       <div className="inline-controls-fields">
@@ -60,41 +47,12 @@ export function InlineMetricControls({
 
         {view === "chill" ? (
           <>
-            <label className="inline-field">
-              <span>Chill band min (°{tempSuffix})</span>
-              <input
-                type="number"
-                step="0.1"
-                value={celsiusToDisplayTemp(settings.chillThresholdMinC, unitSystem)}
-                onChange={(event) => patch({ chillThresholdMinC: displayTempToCelsius(Number(event.target.value), unitSystem) })}
-              />
-            </label>
-            <label className="inline-field">
-              <span>Chill band max (°{tempSuffix})</span>
-              <input
-                type="number"
-                step="0.1"
-                value={celsiusToDisplayTemp(settings.chillThresholdMaxC, unitSystem)}
-                onChange={(event) => patch({ chillThresholdMaxC: displayTempToCelsius(Number(event.target.value), unitSystem) })}
-              />
-            </label>
-            {chillRequirement ? <span className="inline-readout">Requirement: {chillRequirement.toLocaleString()} hrs</span> : null}
+            <span className="inline-readout">Dynamic Model (Chill Portions)</span>
+            {chillRequirement ? <span className="inline-readout">Requirement: {chillRequirement.toLocaleString()} CP</span> : null}
           </>
         ) : null}
 
-        {view === "et" ? (
-          <div className="inline-segmented" role="group" aria-label="ET chart series">
-            <button type="button" className={etChartMode === "cropEt" ? "selected" : ""} onClick={() => onEtChartModeChange("cropEt")}>
-              Crop ET
-            </button>
-            <button type="button" className={etChartMode === "referenceEt" ? "selected" : ""} onClick={() => onEtChartModeChange("referenceEt")}>
-              Reference ET
-            </button>
-            <button type="button" className={etChartMode === "precip" ? "selected" : ""} onClick={() => onEtChartModeChange("precip")}>
-              Precipitation
-            </button>
-          </div>
-        ) : null}
+        {view === "et" ? <span className="inline-readout">Water balance — crop ET vs precipitation</span> : null}
       </div>
 
       <div className="inline-controls-actions">

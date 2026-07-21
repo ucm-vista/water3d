@@ -1,4 +1,4 @@
-import { estimateChillPortions } from "./chill";
+import { cumulativeChillPortions } from "./dynamicModel";
 import { dailyGdd } from "./gdd";
 import { interpolateKc, seasonProgressFromGdd } from "./kc";
 import { dailyMeanVpd } from "./vpd";
@@ -49,7 +49,7 @@ export function buildAnalyticsSnapshot(
   const currentKc = records.at(-1)?.kc ?? effectiveCrop.kcCurve[0].kc;
   const cumulativeEtoMm = Number(weatherWindow.reduce((total, record) => total + record.etoMm, 0).toFixed(1));
   const latestVpd = [...records].reverse().find((record) => typeof record.vpdKpa === "number")?.vpdKpa;
-  const chillPortions = effectiveCrop.chillRequirementPortions ? estimateChillPortions(weather) : undefined;
+  const chillPortions = effectiveCrop.chillRequirementPortions ? (cumulativeChillPortions(weather).at(-1)?.cumulativePortions ?? 0) : undefined;
   const stressLevel =
     latestVpd && latestVpd >= effectiveCrop.stress.highVpdKpa + 0.5 ? "high" : latestVpd && latestVpd >= effectiveCrop.stress.highVpdKpa ? "moderate" : "low";
 

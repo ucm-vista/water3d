@@ -4,4 +4,6 @@ export type { SeasonWeatherResult, YearWeatherResult } from "./weather";
 export { useAnalyticsSnapshot, useChillSeries, useStageProjections } from "./computations";
 export { CLIMATOLOGY_YEARS, useClimatology } from "./climatology";
 export type { ClimatologyResult } from "./climatology";
+export { useChillClimatology } from "./chillClimatology";
+export type { ChillClimatologyResult } from "./chillClimatology";
 export { weatherKeys } from "./keys";

@@ -95,7 +95,7 @@ export function SeasonGddFields({ draft, onChange }: FieldFieldsProps) {
       </div>
       <div className="parameter-grid parameter-grid-pair">
         <label>
-          <span>GDD base temp (&deg;{tempSuffix})</span>
+          <span>GDD base temp{"\u00A0"}(&deg;{tempSuffix})</span>
           <input
             type="number"
             step="0.1"
@@ -104,7 +104,7 @@ export function SeasonGddFields({ draft, onChange }: FieldFieldsProps) {
           />
         </label>
         <label>
-          <span>GDD upper cutoff (&deg;{tempSuffix})</span>
+          <span>GDD upper cutoff{"\u00A0"}(&deg;{tempSuffix})</span>
           <input
             type="number"
             step="0.1"
