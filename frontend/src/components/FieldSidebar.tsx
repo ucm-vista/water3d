@@ -1,17 +1,12 @@
-import { Check, MapPin, Pencil, Search } from "lucide-react";
-import { SearchBox } from "@mapbox/search-js-react";
+import { Check, MapPin, Pencil } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
-import { mapboxConfig } from "../config/mapbox";
 import { useAutosave } from "../hooks/useAutosave";
 import type { FieldConfig } from "../types/domain";
 import { FieldEditorForm } from "./FieldEditorForm";
 import { FieldMapThumbnail } from "./FieldMapThumbnail";
+import { LocationSearch } from "./LocationSearch";
 
 const FieldSetupMap = lazy(() => import("./FieldSetupMap"));
-
-type SearchRetrieveResult = {
-  features: Array<{ geometry: { coordinates: number[] } }>;
-};
 
 interface FieldSidebarProps {
   field: FieldConfig;
@@ -28,19 +23,11 @@ export function FieldSidebar({ field, fields, onSelectField, onUpdateField }: Fi
   const [draft, setDraft] = useState<FieldConfig>(field);
   const [isEditingLocation, setIsEditingLocation] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
-  const [searchValue, setSearchValue] = useState("");
 
   useAutosave(draft, field, onUpdateField);
 
   function setLocation(location: { lat: number; lon: number }) {
     setDraft((current) => ({ ...current, lat: location.lat, lon: location.lon }));
-  }
-
-  function handleSearchRetrieve(result: SearchRetrieveResult) {
-    const coordinates = result.features[0]?.geometry.coordinates;
-    if (!coordinates) return;
-    const [lon, lat] = coordinates;
-    if (Number.isFinite(lat) && Number.isFinite(lon)) setLocation({ lat, lon });
   }
 
   return (
@@ -87,22 +74,7 @@ export function FieldSidebar({ field, fields, onSelectField, onUpdateField }: Fi
           {isEditingLocation ? (
             <div className="sidebar-location-editor">
               <div className="field-search-control">
-                {mapboxConfig.token ? (
-                  <SearchBox
-                    accessToken={mapboxConfig.token}
-                    value={searchValue}
-                    onChange={setSearchValue}
-                    onRetrieve={handleSearchRetrieve}
-                    options={{ country: "US", language: "en", proximity: [draft.lon, draft.lat] }}
-                    componentOptions={{ allowReverse: true, flipCoordinates: true }}
-                    placeholder="Search address or ranch..."
-                  />
-                ) : (
-                  <label className="search-box">
-                    <Search size={18} />
-                    <input placeholder="Add VITE_MAPBOX_ACCESS_TOKEN to enable search" disabled />
-                  </label>
-                )}
+                <LocationSearch onSelect={setLocation} placeholder="Search address or ranch, then press Enter" />
               </div>
               <div className="sidebar-map-surface">
                 <Suspense fallback={<div className="map-loading">Loading map...</div>}>

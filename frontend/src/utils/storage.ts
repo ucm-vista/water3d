@@ -1,10 +1,23 @@
+import { defaultFields } from "../data/fields";
 import type { FieldConfig } from "../types/domain";
-import { loadLocalFields, saveLocalFields } from "../backend/fieldStorage";
+
+const STORAGE_KEY = "water3d.fields.v1";
 
 export function loadFields(): FieldConfig[] {
-  return loadLocalFields();
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return defaultFields;
+    const parsed = JSON.parse(stored) as FieldConfig[];
+    return parsed.length ? parsed : defaultFields;
+  } catch {
+    return defaultFields;
+  }
 }
 
 export function saveFields(fields: FieldConfig[]): void {
-  saveLocalFields(fields);
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(fields));
+  } catch {
+    // Persisting fields is best-effort only (private mode, quota).
+  }
 }

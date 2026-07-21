@@ -1,20 +1,16 @@
-import { BookOpen, ChevronLeft, Info, ListChecks, MapPin, Search } from "lucide-react";
-import { SearchBox } from "@mapbox/search-js-react";
+import { BookOpen, ChevronLeft, Info, ListChecks, MapPin } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 import { cropOptions } from "../data/crops";
 import { getCropMetricProfile } from "../data/cropMetrics";
-import { mapboxConfig } from "../config/mapbox";
+import { mapConfig } from "../config/map";
 import { useAutosave } from "../hooks/useAutosave";
 import type { FieldConfig } from "../types/domain";
 import { getCurrentYearStartDate } from "../utils/dateRange";
 import { cropOptionLabel } from "./CropSelect";
 import { CropField, GeneralInfoFields, SeasonGddFields, StageThresholdsFields } from "./FieldEditorForm";
+import { LocationSearch } from "./LocationSearch";
 
 const FieldSetupMap = lazy(() => import("./FieldSetupMap"));
-
-type SearchRetrieveResult = {
-  features: Array<{ geometry: { coordinates: number[] } }>;
-};
 
 interface SetupPanelProps {
   onCreateField: (field: FieldConfig) => void;
@@ -34,18 +30,14 @@ function newFieldDraft(): FieldConfig {
     name: "",
     cropId: crop.id,
     cropLabel: cropOptionLabel(crop.id),
-    lat: mapboxConfig.defaultCenter.lat,
-    lon: mapboxConfig.defaultCenter.lon,
+    lat: mapConfig.defaultCenter.lat,
+    lon: mapConfig.defaultCenter.lon,
     stageStartDate: getCurrentYearStartDate(),
     gddBaseTempC: metrics.gdd.baseTempC,
     gddUpperTempC: metrics.gdd.upperTempC,
   };
 }
 
-// PocketBase record ids must be exactly 15 chars matching ^[a-z0-9]+$. A
-// human-readable "slug-timestamp" id violates both the length and the pattern,
-// so create() rejects it and the field silently falls back to local-only
-// storage. Generate a PocketBase-shaped id instead.
 function newFieldId(): string {
   const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
   const bytes = new Uint8Array(15);
@@ -60,7 +52,6 @@ function newFieldId(): string {
 export function SetupPanel({ onCreateField, onUpdateField, onCancel, onGoHome, field }: SetupPanelProps) {
   const isEditing = Boolean(field);
   const [draft, setDraft] = useState<FieldConfig>(() => field ?? newFieldDraft());
-  const [searchValue, setSearchValue] = useState("");
 
   // When editing an existing field, autosave edits (debounced) instead of
   // requiring an explicit save. Passing `field ?? draft` as the saved snapshot
@@ -72,13 +63,6 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, onGoHome, f
 
   function setLocation(location: { lat: number; lon: number }) {
     setDraft((current) => ({ ...current, lat: location.lat, lon: location.lon }));
-  }
-
-  function handleSearchRetrieve(result: SearchRetrieveResult) {
-    const coordinates = result.features[0]?.geometry.coordinates;
-    if (!coordinates) return;
-    const [lon, lat] = coordinates;
-    if (Number.isFinite(lat) && Number.isFinite(lon)) setLocation({ lat, lon });
   }
 
   function handleSubmit() {
@@ -142,22 +126,7 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, onGoHome, f
               </div>
               <p className="config-card-hint">Search for a ranch or drop a pin to bind the weather grid used for GDD and chill calculations.</p>
               <div className="field-search-control">
-                {mapboxConfig.token ? (
-                  <SearchBox
-                    accessToken={mapboxConfig.token}
-                    value={searchValue}
-                    onChange={setSearchValue}
-                    onRetrieve={handleSearchRetrieve}
-                    options={{ country: "US", language: "en", proximity: [draft.lon, draft.lat] }}
-                    componentOptions={{ allowReverse: true, flipCoordinates: true }}
-                    placeholder="Search address, ranch name, or lat/long..."
-                  />
-                ) : (
-                  <label className="search-box">
-                    <Search size={22} />
-                    <input placeholder="Add VITE_MAPBOX_ACCESS_TOKEN to enable field search" disabled />
-                  </label>
-                )}
+                <LocationSearch onSelect={setLocation} placeholder="Search address, ranch name, or lat/long, then press Enter" />
               </div>
               <div className="map-surface config-map-surface">
                 <Suspense fallback={<div className="map-loading">Loading map...</div>}>

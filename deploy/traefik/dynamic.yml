@@ -7,8 +7,7 @@
 #     rewrites Host to the upstream == Caddy `header_up Host`.
 #   * shared middlewares (security headers, gzip) applied to every router.
 #
-# The SPA (web) and PocketBase (/pb) routers are docker labels — see
-# docker-compose.yml.
+# The SPA (web) router is docker labels — see docker-compose.yml.
 
 http:
   middlewares:
@@ -25,8 +24,6 @@ http:
     strip-gridmet:         { stripPrefix: { prefixes: ["/api/gridmet"] } }
     strip-climate-toolbox: { stripPrefix: { prefixes: ["/api/climate-toolbox"] } }
     strip-open-meteo:      { stripPrefix: { prefixes: ["/api/open-meteo"] } }
-    strip-openet:          { stripPrefix: { prefixes: ["/api/openet"] } }
-    strip-soil-data:       { stripPrefix: { prefixes: ["/api/soil-data-access"] } }
 
   # Priority 100 so these always beat the SPA catch-all (Host + PathPrefix `/`).
   # Path-only rules are fine: this node only serves the one app on :443, and the
@@ -53,20 +50,6 @@ http:
       tls: {}
       service: open-meteo
       middlewares: [strip-open-meteo, security-headers, gzip]
-    openet:
-      rule: "PathPrefix(`/api/openet`)"
-      priority: 100
-      entryPoints: [websecure]
-      tls: {}
-      service: openet
-      middlewares: [strip-openet, security-headers, gzip]
-    soil-data-access:
-      rule: "PathPrefix(`/api/soil-data-access`)"
-      priority: 100
-      entryPoints: [websecure]
-      tls: {}
-      service: soil-data-access
-      middlewares: [strip-soil-data, security-headers, gzip]
 
   services:
     gridmet:
@@ -81,14 +64,6 @@ http:
       loadBalancer:
         passHostHeader: false
         servers: [{ url: "https://archive-api.open-meteo.com" }]
-    openet:
-      loadBalancer:
-        passHostHeader: false
-        servers: [{ url: "https://openet-api.org" }]
-    soil-data-access:
-      loadBalancer:
-        passHostHeader: false
-        servers: [{ url: "https://sdmdataaccess.nrcs.usda.gov" }]
 
 # ---- wildcard TLS certificate for *.vistacompute1.ucmerced.edu ---------------
 # The app is served under this wildcard zone, so a wildcard cert is required

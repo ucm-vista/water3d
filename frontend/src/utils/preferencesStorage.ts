@@ -21,8 +21,6 @@ export interface FieldGraphPrefs {
   etChartMode?: EtChartMode;
 }
 
-// Seam for account-backed preference storage: a future PocketBase
-// `user_preferences` collection implements this same interface.
 export interface PreferencesRepository {
   load(fieldId: string): FieldGraphPrefs | undefined;
   save(fieldId: string, prefs: FieldGraphPrefs): void;

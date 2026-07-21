@@ -44,7 +44,7 @@ const FEATURES = [
   {
     icon: Droplets,
     title: "Chill & evapotranspiration",
-    body: "Chill-portion accumulation for perennials from real hourly temperatures, and crop-ET tracking driven by OpenET and gridMET reference ETo.",
+    body: "Chill-portion accumulation for perennials from real hourly temperatures, and crop-ET tracking driven by gridMET reference ETo.",
   },
   {
     icon: CalendarClock,
@@ -66,8 +66,8 @@ const COMPUTATIONS = [
   {
     icon: Droplets,
     title: "Crop evapotranspiration (ETc)",
-    formula: "ETc = OpenET actual ET   ·or·   ETo × Kc(stage)",
-    body: "OpenET satellite actual ET is used when available; otherwise reference ETo is scaled by the crop coefficient Kc, interpolated along the crop's Kc curve using GDD-based season progress. See calcs/kc.ts + calcs/analytics.ts.",
+    formula: "ETc = ETo × Kc(stage)",
+    body: "Reference ETo is scaled by the crop coefficient Kc, interpolated along the crop's Kc curve using GDD-based season progress. See calcs/kc.ts + calcs/analytics.ts.",
   },
   {
     icon: CalendarClock,
@@ -100,11 +100,9 @@ const CROPS = ["Almond", "Processing Tomato", "Wine Grape", "Pistachio", "Cotton
 const DATA_SOURCES = [
   { name: "gridMET", role: "Primary daily history — Tmin/Tmax, precip, reference ETo, RH, and VPD on a ~4 km grid back to 1979. Drives GDD, ETo, precipitation, and the 30-year climatology." },
   { name: "Climate Toolbox CFS", role: "28-day forward PET + weather forecast from the CFSv2 ensemble; extends the season lines and stage projections past today." },
-  { name: "OpenET", role: "Satellite-derived actual crop ET (ETc) when available; ETc falls back to ETo × Kc otherwise." },
   { name: "Open-Meteo", role: "Real hourly air temperatures feeding the Dynamic-Model chill calculation." },
   { name: "Climate Toolbox winter-chill", role: "Precomputed chill-portion accumulation and historical bands for perennials." },
-  { name: "NRCS Soil Data Access", role: "Soil map unit, texture, hydrologic group, and AWHC lookup during field setup." },
-  { name: "Mapbox", role: "Search + map during field setup; static thumbnails per field." },
+  { name: "Esri + OSM Nominatim", role: "Keyless satellite basemap, geocoding, and static thumbnails during field setup." },
 ];
 
 // The Home view: an about-style landing page that introduces Water 3D. Shown by
@@ -225,7 +223,7 @@ export function Home({ hasFields, onGetStarted }: HomeProps) {
         <Info size={18} aria-hidden="true" />
         <p>
           Water 3D is a decision-support tool, not automated advice. Several paths are demo/fallback and stage thresholds should
-          be reviewed before advisory use. Fields are stored in your browser until you sign in.
+          be reviewed before advisory use. Fields are stored in your browser.
         </p>
       </section>
 

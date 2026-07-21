@@ -1433,6 +1433,33 @@ dd {
   display: block;
 }
 
+.field-map-thumb-pin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /* Anchor the pin's tip (bottom-center of the icon) on the coordinate. */
+  transform: translate(-50%, -100%);
+  color: #934936;
+}
+
+.field-map-thumb-attrib {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+.search-status {
+  flex-shrink: 0;
+  font-family: Geist, ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #934936;
+}
+
 .field-map-thumb-fallback {
   position: absolute;
   inset: 0;
@@ -1532,16 +1559,6 @@ dd {
   margin: 28px 0 22px;
 }
 
-.field-search-control mapbox-search-box {
-  display: block;
-  width: 100%;
-  --mapbox-search-border-radius: 8px;
-  --mapbox-search-border: 1px solid #c4c6cc;
-  --mapbox-search-background-color: #f5f3ef;
-  --mapbox-search-color: #061827;
-  --mapbox-search-font-family: Geist, Inter, system-ui, sans-serif;
-}
-
 .search-box {
   height: 58px;
   display: flex;
@@ -1571,8 +1588,8 @@ dd {
   background: #d8d8d2;
 }
 
-.mapbox-shell,
-.mapbox-canvas {
+.map-shell,
+.map-canvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1589,14 +1606,8 @@ dd {
   font-weight: 800;
 }
 
-.mapbox-canvas .mapboxgl-canvas {
+.map-canvas .maplibregl-canvas {
   outline: 0;
-}
-
-.mapboxgl-ctrl-bottom-left,
-.mapboxgl-ctrl-logo,
-.mapboxgl-ctrl-attrib {
-  display: none !important;
 }
 
 .setup-side {
@@ -3292,8 +3303,8 @@ dd {
   overflow: hidden;
 }
 
-.location-map-surface .mapbox-shell,
-.location-map-surface .mapbox-canvas {
+.location-map-surface .map-shell,
+.location-map-surface .map-canvas {
   height: 100%;
   width: 100%;
 }

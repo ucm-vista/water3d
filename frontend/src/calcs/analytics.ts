@@ -26,7 +26,7 @@ export function buildAnalyticsSnapshot(
     const gdd = dailyGdd(record, effectiveCrop);
     cumulativeGddValue += gdd;
     const kc = interpolateKc(effectiveCrop, seasonProgressFromGdd(effectiveCrop, cumulativeGddValue));
-    const etcMm = Number((record.etActualMm ?? record.etoMm * kc).toFixed(1));
+    const etcMm = Number((record.etoMm * kc).toFixed(1));
     cumulativeEtcMm += etcMm;
     cumulativeEtoMmValue += record.etoMm;
 
@@ -57,7 +57,7 @@ export function buildAnalyticsSnapshot(
     nextStage
       ? `${nextStage.label} is ${Math.max(0, Math.round((nextStage.gdd ?? 0) - currentGdd))} GDD away at current accumulation.`
       : "The field has reached the final configured stage for this crop profile.",
-    `OpenET-style ETc is ${Math.abs(cumulativeEtcMm - cumulativeEtoMm).toFixed(1)} mm ${cumulativeEtcMm >= cumulativeEtoMm ? "above" : "below"} reference ETo for the selected period.`,
+    `Modeled ETc is ${Math.abs(cumulativeEtcMm - cumulativeEtoMm).toFixed(1)} mm ${cumulativeEtcMm >= cumulativeEtoMm ? "above" : "below"} reference ETo for the selected period.`,
     latestVpd && latestVpd >= crop.stress.highVpdKpa
       ? `VPD is elevated at ${latestVpd} kPa; water demand should be watched closely.`
       : "Current atmospheric demand is within the normal operating range.",

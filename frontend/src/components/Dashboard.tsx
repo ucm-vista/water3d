@@ -978,7 +978,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
       label: "Crop ET (demand)",
       color: CROP_ET_COLOR,
       source:
-        "Cumulative crop ET (ETc): OpenET satellite actual ET when available, otherwise reference ETo × the crop coefficient (Kc) for the current growth stage — the water the crop uses.",
+        "Cumulative crop ET (ETc): reference ETo × the crop coefficient (Kc) for the current growth stage — the water the crop uses.",
     });
     legendItems.push({
       label: "Precipitation (supply)",
@@ -1091,7 +1091,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
               value: snapshot.records.length ? formatEt(observedEtc) : "Pending",
               detail: "Water used to date",
               icon: Droplets,
-              info: "Cumulative crop ET (ETc) to date — OpenET actual ET, or reference ETo × the crop coefficient (Kc).",
+              info: "Cumulative crop ET (ETc) to date — reference ETo × the crop coefficient (Kc).",
             },
             {
               label: "Precip (supply)",

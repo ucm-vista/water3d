@@ -11,7 +11,7 @@ export interface Coordinates {
 }
 
 export interface ApiMetadata {
-  provider: "mapbox" | "openet" | "open-meteo" | "gridmet" | "nrcs-soil-data-access" | "catherine" | "climate" | "local" | "unknown";
+  provider: "nominatim" | "open-meteo" | "gridmet" | "catherine" | "climate" | "local" | "unknown";
   generatedAt?: string;
   qualityFlags?: string[];
   sourceUrl?: string;
@@ -33,14 +33,6 @@ export interface FieldSetupContext extends Coordinates {
   county?: string;
   region?: string;
   timezone?: string;
-  soilTexture: string;
-  awhcMmPerM: number;
-  soilMapUnitKey?: string;
-  soilMapUnitName?: string;
-  soilComponentName?: string;
-  soilComponentPercent?: number;
-  hydrologicGroup?: string;
-  drainageClass?: string;
   weatherCellId: string;
   weatherProvider?: string;
   elevationFt: number;
@@ -76,19 +68,14 @@ export interface EtDataRequest extends ApiDateRange, Coordinates {
   fieldId?: string;
 }
 
-export type EtDataVariable = "ET" | "ETo" | "PR" | "ETof" | "NDVI" | "MODEL_COUNT";
-
 export interface EtDataResponse {
   records: Array<{
     date: string;
     etoMm?: number;
-    etActualMm?: number;
     etReferenceMm?: number;
     forecastPetP10Mm?: number;
     forecastPetP90Mm?: number;
     precipMm?: number;
-    ndvi?: number;
-    modelCount?: number;
     source: "historical" | "forecast";
   }>;
   historicalComparison?: HistoricalComparisonPoint[];

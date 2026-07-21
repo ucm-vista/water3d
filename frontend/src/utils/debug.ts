@@ -1,5 +1,5 @@
 const DEBUG_STORAGE_KEY = "water3d.debug";
-const CONSOLE_LOG_SOURCES = new Set(["openet", "pocketbase-openet-cache", "climate-toolbox", "gridmet"]);
+const CONSOLE_LOG_SOURCES = new Set(["climate-toolbox", "gridmet"]);
 
 export type DataSourceStatus = Record<string, unknown>;
 

@@ -3,8 +3,6 @@ import { API_REGISTRY } from "./apiRegistry";
 import { climateToolboxConfig } from "./climate";
 import { gridMetConfig } from "./gridmet";
 import { openMeteoConfig } from "./openMeteo";
-import { openEtConfig } from "./openet";
-import { soilDataAccessConfig } from "./soil";
 
 function entry(id: string) {
   const found = API_REGISTRY.find((item) => item.id === id);
@@ -29,8 +27,6 @@ describe("API_REGISTRY", () => {
     expect(entry("gridmet").upstreamBaseUrl).toBe(gridMetConfig.baseUrl);
     expect(entry("climate-toolbox-cfs").upstreamBaseUrl).toBe(climateToolboxConfig.cfsBaseUrl);
     expect(entry("open-meteo").upstreamBaseUrl).toBe(openMeteoConfig.archiveBaseUrl);
-    expect(entry("openet").upstreamBaseUrl).toBe(openEtConfig.baseUrl);
-    expect(entry("soil-data-access").upstreamBaseUrl).toBe(soilDataAccessConfig.baseUrl);
   });
 
   it("records the pending Climate Toolbox climatology endpoint as gridMET's planned replacement", () => {

@@ -10,9 +10,6 @@
 import { climateToolboxConfig } from "./climate";
 import { gridMetConfig } from "./gridmet";
 import { openMeteoConfig } from "./openMeteo";
-import { openEtConfig } from "./openet";
-import { soilDataAccessConfig } from "./soil";
-import { backendConfig } from "./backend";
 
 export interface ApiOwner {
   org: string;
@@ -94,51 +91,27 @@ export const API_REGISTRY: ApiRegistryEntry[] = [
     notes: "Requested already in metric (°C, mm).",
   },
   {
-    id: "openet",
-    name: "OpenET (satellite actual ET)",
-    role: "Opt-in, token-gated: satellite actual ET replaces the modeled ETo×Kc estimate day-by-day. Responses cached in PocketBase.",
-    upstreamBaseUrl: openEtConfig.baseUrl,
-    proxyPath: "/api/openet",
-    httpMethod: "POST",
-    configModule: "src/config/openet.ts",
-    providerModule: "src/api/openEt.ts",
-    owner: { org: "OpenET", contact: "https://etdata.org / support@etdata.org" },
-    docsUrl: "https://openet.gitbook.io/docs",
-    notes: "Bearer-token auth; off by default (VITE_OPENET_ENABLED).",
-  },
-  {
-    id: "soil-data-access",
-    name: "NRCS Soil Data Access / SSURGO",
-    role: "One-time field-setup context: soil texture, hydrologic group, AWHC. Stored on the field; not yet consumed by any calculation.",
-    upstreamBaseUrl: soilDataAccessConfig.baseUrl,
-    proxyPath: "/api/soil-data-access",
-    httpMethod: "POST",
-    configModule: "src/config/soil.ts",
-    providerModule: "src/api/soil.ts",
-    owner: { org: "USDA NRCS", contact: "https://sdmdataaccess.nrcs.usda.gov" },
-  },
-  {
-    id: "mapbox",
-    name: "Mapbox (tiles, static images, geocoding)",
-    role: "Field-picker map, thumbnails, and address→lat/lon — the coordinates that key every weather/ET/soil request. Called directly (not proxied).",
-    upstreamBaseUrl: "https://api.mapbox.com",
+    id: "esri-world-imagery",
+    name: "Esri World Imagery (satellite tiles)",
+    role: "Field-picker basemap (MapLibre GL raster tiles) and field thumbnails (MapServer export endpoint). Called directly (not proxied).",
+    upstreamBaseUrl: "https://server.arcgisonline.com",
     proxyPath: "(direct — not proxied)",
-    httpMethod: "mixed",
-    configModule: "src/config/mapbox.ts",
+    httpMethod: "GET",
+    configModule: "src/config/map.ts",
     providerModule: "src/components/FieldSetupMap.tsx, FieldMapThumbnail.tsx",
-    owner: { org: "Mapbox", contact: "https://docs.mapbox.com" },
-    notes: "Public pk.* token via VITE_MAPBOX_ACCESS_TOKEN.",
+    owner: { org: "Esri", contact: "https://www.esri.com/en-us/legal/terms/data-attributions" },
+    notes: "Keyless; attribution required and shown in the map's attribution control / thumbnail corner.",
   },
   {
-    id: "pocketbase",
-    name: "PocketBase (auth + persistence)",
-    role: "User accounts, saved fields, and the OpenET response cache. Not a weather/measurement source.",
-    upstreamBaseUrl: backendConfig.pocketBaseUrl,
-    proxyPath: "/pb",
-    httpMethod: "REST",
-    configModule: "src/config/backend.ts",
-    providerModule: "src/backend/pocketbaseClient.ts",
-    owner: { org: "Water3D self-hosted", contact: "Ibrahim (project maintainer)" },
-    notes: "Prod URL must be public https. Field sync currently gated off (BROWSER_STORAGE_ONLY in backend/fieldStorage.ts).",
+    id: "nominatim",
+    name: "OSM Nominatim (geocoding)",
+    role: "Address/place → lat/lon during field setup — the coordinates that key every weather/ET request. Called directly (not proxied).",
+    upstreamBaseUrl: "https://nominatim.openstreetmap.org",
+    proxyPath: "(direct — not proxied)",
+    httpMethod: "GET",
+    configModule: "src/config/map.ts",
+    providerModule: "src/components/LocationSearch.tsx",
+    owner: { org: "OpenStreetMap Foundation", contact: "https://operations.osmfoundation.org/policies/nominatim/" },
+    notes: "Keyless; usage policy caps at 1 req/s and disallows autocomplete — search fires on Enter only.",
   },
 ];

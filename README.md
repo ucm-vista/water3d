@@ -7,53 +7,30 @@ year-over-year comparisons**.
 
 - **`frontend/`** — React + Vite + TypeScript single-page app. Agronomic math lives
   in pure modules under `src/calcs`; data-provider contracts under `src/api`.
-- **`pocketbase/`** — PocketBase backend (Docker): user accounts + owner-scoped
-  field storage. The app falls back to `localStorage` when it isn't running.
-- **`deploy/`** — production **Traefik** stack (edge TLS + routing, nginx SPA,
-  PocketBase) on one subdomain under `*.vistacompute1.ucmerced.edu`, auto-HTTPS.
+- **`deploy/`** — production **Traefik** stack (edge TLS + routing, nginx SPA)
+  on one subdomain under `*.vistacompute1.ucmerced.edu`, auto-HTTPS.
+
+There is no backend: fields and settings live in the browser (`localStorage`).
 
 ---
 
 ## Quick start (fresh clone)
 
-**Prerequisites:** Node 22 + npm, and Docker with the Compose plugin
-(`docker compose version`).
+**Prerequisites:** Node 22 + npm.
 
 ```bash
-git clone <repo> && cd w3d_v2
-
-# 1. Backend — PocketBase (migrations auto-apply on first boot)
-cd pocketbase
-docker compose up -d
-docker compose exec pocketbase /usr/local/bin/pocketbase superuser create admin@example.com "change-me-please"
-curl -s http://127.0.0.1:8090/api/health        # sanity check
-
-# 2. Frontend
-cd ../frontend
+git clone <repo> && cd w3d_v2/frontend
 npm install
-cp .env.example .env
-#    edit .env: set VITE_POCKETBASE_ENABLED=true
-#               and  VITE_POCKETBASE_URL=http://127.0.0.1:8090
+cp .env.example .env    # optional: tweak data-source toggles (no keys needed)
 npm run dev
 ```
 
-Open the printed URL (default http://localhost:5173). Click the user icon →
-**Sign up** to create an account; that switches field storage from `localStorage`
-to PocketBase. The PocketBase admin UI is at http://127.0.0.1:8090/_/.
-
-> The app runs **without** the backend too — it just stays on `localStorage` with
-> no accounts or cross-device storage until PocketBase is up.
+Open the printed URL (default http://localhost:5173).
 
 ### Gotchas
 
 - **Env is build-time.** `frontend/.env` is gitignored (only `.env.example` is
   committed) and is read when Vite starts — **restart `npm run dev`** after editing it.
-- **`.env.example` ships with PocketBase disabled.** You must set
-  `VITE_POCKETBASE_ENABLED=true` for login/signup to appear and work.
-- **Signup returns 403** → in the admin UI, `users` → API Rules → leave the
-  Create rule empty (public registration).
-- **No Docker?** Drop a PocketBase binary (≥ 0.23) into `pocketbase/` and run
-  `./pocketbase serve --http=0.0.0.0:8090` — it picks up the same `pb_migrations/`.
 
 ---
 
@@ -64,26 +41,6 @@ to PocketBase. The PocketBase admin UI is at http://127.0.0.1:8090/_/.
 | `npm run dev` (in `frontend/`) | Vite dev server |
 | `npm test` | Vitest unit tests |
 | `npm run build` | TypeScript build + production bundle |
-| `docker compose up -d` (in `pocketbase/`) | start backend |
-| `docker compose logs -f` | follow backend logs / migrations |
-| `docker compose down` / `down -v` | stop (keep data) / stop and **wipe** data |
-
----
-
-## Backend (PocketBase)
-
-On first boot the migrations in `pocketbase/pb_migrations/` create:
-
-| Collection | Purpose |
-| --- | --- |
-| `users` | Built-in auth collection (login/signup target) |
-| `fields` | User fields, owner-scoped (`owner = @request.auth.id`) |
-| `crop_types` | Crop profiles (seeded) |
-| `soil_types` | Soil profiles |
-| `openet_cache` | Server-side cache for OpenET responses |
-
-Data persists in the named `pb_data` Docker volume. See
-[`pocketbase/README.md`](pocketbase/README.md) for full details and troubleshooting.
 
 ---
 
@@ -97,9 +54,8 @@ production equivalent is Traefik reverse-proxying the same paths.
 | **gridMET** (Climate Toolbox) | Primary history | Daily Tmin/Tmax, precip, ETo, RH, VPD back to 1979 via `/api/gridmet`. ~2-day lag; truncated tails are flagged with the actual last-available date. |
 | **Climate Toolbox CFS** | Forecast | 28-day PET + weather via `/api/climate-toolbox`, `calc-mode=all`; PET p10/median/p90 computed client-side from 48 ensemble members. |
 | **Open-Meteo** | Chill season | Sole source of real hourly temperatures (used for chill-hour accumulation). |
-| **OpenET** | Historical ET | Point time series, cached in PocketBase `openet_cache`. Adapter present but **not wired into the current GDD-focused UI**. |
-| **NRCS Soil Data Access** | Soil lookup | Map unit / texture / hydrologic group / AWHC, with local defaults as fallback. |
-| **Mapbox** | Setup map | Search + GL map during field setup; static images for field thumbnails. |
+| **Esri World Imagery** | Setup map | Keyless satellite tiles (MapLibre GL) during field setup; static thumbnails via the export endpoint. |
+| **OSM Nominatim** | Geocoding | Keyless address/place search on Enter (usage policy forbids autocomplete). |
 
 Client-side caching: gridMET responses also persist to a versioned `localStorage`
 cache (`src/api/weatherCache.ts`, 7-day TTL) for fast repaints. TanStack Query
@@ -155,20 +111,18 @@ are editable per field and override the profile defaults. See
 
 Production runs behind **Traefik** on one subdomain under
 `*.vistacompute1.ucmerced.edu` — Traefik terminates HTTPS and routes the static
-SPA (nginx), the `/api/*` weather proxies, and `/pb/*` → PocketBase. It lives in
+SPA (nginx) and the `/api/*` weather proxies. It lives in
 [`deploy/`](deploy/README.md):
 
 ```bash
 cd deploy
-cp ../frontend/.env.production.example ../frontend/.env.production   # set domain + Mapbox token
-export DOMAIN=water3d.vistacompute1.ucmerced.edu ACME_EMAIL=you@ucmerced.edu
+cp ../frontend/.env.production.example ../frontend/.env.production
 docker compose up -d --build
 ```
 
 Key points: weather APIs **require** the `/api/*` proxy in prod (a bare static
-host breaks data); `VITE_POCKETBASE_URL` must point at the public
-`https://<domain>/pb`; and the Traefik + PocketBase admin dashboards are
-loopback-only (reach them via `ssh -L 8080:localhost:8080 -L 8090:localhost:8090 <server>`).
+host breaks data), and the Traefik dashboard is loopback-only (reach it via
+`ssh -L 8080:localhost:8080 <server>`).
 
 ---
 
@@ -176,12 +130,11 @@ loopback-only (reach them via `ssh -L 8080:localhost:8080 -L 8090:localhost:8090
 
 ```
 frontend/src/
-  api/        provider contracts + clients (gridMet, climate, openEt, soil, openMeteo)
+  api/        provider contracts + clients (gridMet, climate, openMeteo)
   calcs/      pure agronomic math (gdd, chill, kc, vpd, analytics, stageProjection)
-  components/ React UI (Dashboard, FieldManager, SetupPanel, AuthStatus, …)
-  backend/    PocketBase client, auth + field repositories, localStorage fallback
-  config/     env-driven config (backend, gridmet)
+  components/ React UI (Dashboard, FieldManager, SetupPanel, …)
+  config/     env-driven config (gridmet, climate, …)
   types/      domain types (FieldConfig, WeatherRecord, CropProfile, …)
-pocketbase/   docker-compose + pb_migrations (collections/schema) — local dev backend
+  utils/      localStorage persistence (fields, per-field prefs), helpers
 deploy/       Traefik prod stack: docker-compose.yml + Dockerfile (nginx SPA) + traefik/{traefik,dynamic}.yml
 ```

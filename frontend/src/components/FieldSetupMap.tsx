@@ -1,7 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
-import { mapboxConfig } from "../config/mapbox";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { mapConfig } from "../config/map";
+
+const satelliteStyle: maplibregl.StyleSpecification = {
+  version: 8,
+  sources: {
+    satellite: {
+      type: "raster",
+      tiles: [mapConfig.tileUrl],
+      // Esri serves 256px tiles; declaring 128 makes MapLibre fetch one zoom
+      // level deeper and render at 2x density — sharp on hi-DPI displays at
+      // the cost of 4x tile requests. maxzoom drops by one to compensate.
+      tileSize: 128,
+      maxzoom: mapConfig.maxZoom - 1,
+      attribution: mapConfig.tileAttribution,
+    },
+  },
+  layers: [{ id: "satellite", type: "raster", source: "satellite" }],
+};
 
 interface FieldSetupMapProps {
   lat: number;
@@ -11,8 +28,8 @@ interface FieldSetupMapProps {
 
 function FieldSetupMap({ lat, lon, onLocationChange }: FieldSetupMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const markerRef = useRef<mapboxgl.Marker | null>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const markerRef = useRef<maplibregl.Marker | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
   const initialLocationRef = useRef({ lat, lon });
   const onLocationChangeRef = useRef(onLocationChange);
   const [error, setError] = useState<string | null>(null);
@@ -24,33 +41,23 @@ function FieldSetupMap({ lat, lon, onLocationChange }: FieldSetupMapProps) {
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    if (!mapboxConfig.token || !mapboxConfig.styleUrl) {
-      setError("Mapbox env vars are not configured.");
-      return;
-    }
-
-    if (!mapboxgl.supported()) {
-      setError("Mapbox is not supported in this browser.");
-      return;
-    }
 
     try {
       setError(null);
       setIsLoaded(false);
-      mapboxgl.accessToken = mapboxConfig.token;
       const initialLocation = initialLocationRef.current;
 
-      const map = new mapboxgl.Map({
+      const map = new maplibregl.Map({
         container: containerRef.current,
-        style: mapboxConfig.styleUrl,
+        style: satelliteStyle,
         center: [initialLocation.lon, initialLocation.lat],
-        zoom: mapboxConfig.defaultZoom,
-        attributionControl: false,
+        zoom: mapConfig.defaultZoom,
+        attributionControl: { compact: true },
       });
 
-      map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
 
-      const marker = new mapboxgl.Marker({ color: "#934936" }).setLngLat([initialLocation.lon, initialLocation.lat]).addTo(map);
+      const marker = new maplibregl.Marker({ color: "#934936" }).setLngLat([initialLocation.lon, initialLocation.lat]).addTo(map);
       markerRef.current = marker;
       mapRef.current = map;
 
@@ -62,13 +69,6 @@ function FieldSetupMap({ lat, lon, onLocationChange }: FieldSetupMapProps) {
       map.once("load", markLoaded);
       map.once("style.load", markLoaded);
       map.once("idle", markLoaded);
-
-      map.on("error", (event) => {
-        const message = event.error?.message ?? "";
-        if (message.toLowerCase().includes("token") || message.toLowerCase().includes("style")) {
-          setError(message || "Mapbox failed to load.");
-        }
-      });
 
       map.on("click", (event) => {
         const nextLocation = {
@@ -97,7 +97,7 @@ function FieldSetupMap({ lat, lon, onLocationChange }: FieldSetupMapProps) {
         setIsLoaded(false);
       };
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Mapbox failed to initialize.");
+      setError(caught instanceof Error ? caught.message : "Map failed to initialize.");
       return;
     }
   }, []);
@@ -108,8 +108,8 @@ function FieldSetupMap({ lat, lon, onLocationChange }: FieldSetupMapProps) {
   }, [lat, lon]);
 
   return (
-    <div className="mapbox-shell">
-      <div ref={containerRef} className="mapbox-canvas" />
+    <div className="map-shell">
+      <div ref={containerRef} className="map-canvas" />
       {!isLoaded && !error ? <div className="map-loading">Loading map...</div> : null}
       {error ? <div className="map-loading map-error">{error}</div> : null}
     </div>

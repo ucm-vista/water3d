@@ -10,15 +10,13 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@mapbox/search-js-react": "^1.5.1",
     "@tanstack/query-sync-storage-persister": "^5.101.2",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-query-persist-client": "^5.101.2",
     "@vitejs/plugin-react": "^5.0.0",
     "html-to-image": "^1.11.13",
     "lucide-react": "^0.468.0",
-    "mapbox-gl": "^3.24.0",
-    "pocketbase": "^0.27.0",
+    "maplibre-gl": "^5.24.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.0",

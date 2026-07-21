@@ -15,9 +15,9 @@ log:
 
 accessLog: {}
 
-# Dashboard on :8080. Published to the host loopback ONLY in docker-compose.yml
-# (like the PocketBase admin), so `insecure` here just means "no auth on a port
-# that isn't reachable from the internet". Reach it via an SSH tunnel:
+# Dashboard on :8080. Published to the host loopback ONLY in docker-compose.yml,
+# so `insecure` here just means "no auth on a port that isn't reachable from
+# the internet". Reach it via an SSH tunnel:
 #   ssh -L 8080:localhost:8080 <server>  →  http://localhost:8080/dashboard/
 api:
   dashboard: true
@@ -37,8 +37,8 @@ entryPoints:
     address: ":443"
 
 providers:
-  # Per-service routers (web, pocketbase) are declared as labels on those
-  # containers. Only labelled containers are exposed.
+  # Per-service routers (web) are declared as labels on those containers.
+  # Only labelled containers are exposed.
   docker:
     exposedByDefault: false
     network: water3d_edge

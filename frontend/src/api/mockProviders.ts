@@ -35,8 +35,6 @@ export class MockLocationProvider implements LocationProvider {
     return {
       ...location,
       label: "Green Valley Ranch",
-      soilTexture: "Sandy Loam (SSURGO)",
-      awhcMmPerM: 150,
       weatherCellId: "Grid ID #4829",
       elevationFt: 342,
       metadata: { provider: "local" },

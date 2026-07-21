@@ -5,10 +5,10 @@
 #   docker compose -f docker-compose.yml -f docker-compose.vistacompute1.yml up -d --build
 #
 # What this changes vs. the base file:
-#   * joins web + pocketbase to the external vistacompute-proxy network, which
+#   * joins web to the external vistacompute-proxy network, which
 #     is the network the shared Traefik's docker provider routes through
 #     (traefik.docker.network tells it which of the containers' networks to use)
-#   * pins the routers to Host(water3d...) — the base file's wildcard HostRegexp
+#   * pins the router to Host(water3d...) — the base file's wildcard HostRegexp
 #     catch-all would swallow every unmatched *.vistacompute1 subdomain on a
 #     shared edge
 #   * swaps middleware names to the shared Traefik's file-provider names
@@ -28,13 +28,6 @@ services:
       - "traefik.docker.network=vistacompute-proxy"
       - "traefik.http.routers.w3d-web.rule=Host(`water3d.vistacompute1.ucmerced.edu`)"
       - "traefik.http.routers.w3d-web.middlewares=secure-headers@file,compress@file"
-
-  pocketbase:
-    networks: [edge, proxy]
-    labels:
-      - "traefik.docker.network=vistacompute-proxy"
-      - "traefik.http.routers.w3d-pb.rule=Host(`water3d.vistacompute1.ucmerced.edu`) && PathPrefix(`/pb`)"
-      - "traefik.http.routers.w3d-pb.middlewares=w3d-pb-strip@docker,secure-headers@file,compress@file"
 
 networks:
   proxy:

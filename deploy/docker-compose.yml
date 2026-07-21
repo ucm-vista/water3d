@@ -3,23 +3,19 @@
 #
 #   traefik      TLS (wildcard cert) + routing. Any *.vistacompute1.ucmerced.edu
 #                host reaches the app. Weather-API proxies and shared middlewares
-#                live in traefik/dynamic.yml; the SPA and PocketBase routers are
-#                the labels below.
+#                live in traefik/dynamic.yml; the SPA router is the labels below.
 #   web          nginx serving the static SPA bundle (baked at build time).
-#   pocketbase   auth + owner-scoped field storage, routed under /pb.
 #
 # Setup (standalone box — this stack owns ports 80/443):
-#   cp ../frontend/.env.production.example ../frontend/.env.production   # set VITE_POCKETBASE_URL + Mapbox token
+#   cp ../frontend/.env.production.example ../frontend/.env.production
 #   #  drop the wildcard cert into deploy/certs/ (vistacompute1.crt + vistacompute1.key)
 #   docker compose --profile standalone up -d --build
 #
 # Setup (vistacompute1 — shared edge Traefik already owns 80/443):
 #   docker compose -f docker-compose.yml -f docker-compose.vistacompute1.yml up -d --build
-#   docker compose exec pocketbase /usr/local/bin/pocketbase \
-#     superuser create admin@ucmerced.edu '<strong-password>' --dir=/pb/pb_data
 #
-# DNS: point the app's chosen name (e.g. water3d.vistacompute1.ucmerced.edu, the
-# VITE_POCKETBASE_URL host) at this server; open ports 80 + 443.
+# DNS: point the app's chosen name (e.g. water3d.vistacompute1.ucmerced.edu) at
+# this server; open ports 80 + 443.
 
 name: water3d
 
@@ -36,7 +32,7 @@ services:
       # --- TLS alternative: Let's Encrypt HTTP-01 (per-hostname certs only, NOT
       #     wildcard). If vistacompute1 is public and you'd rather auto-issue a
       #     cert for one specific host than provide a wildcard cert, uncomment
-      #     these, pin `web`/`pb` router rules to that Host(), and re-add the
+      #     these, pin the `web` router rule to that Host(), and re-add the
       #     `...tls.certresolver=letsencrypt` labels. See deploy/README.md.
       # - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
       # - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
@@ -49,7 +45,7 @@ services:
       #   ssh -L 8080:localhost:8080 <server>  →  http://localhost:8080/dashboard/
       - "127.0.0.1:8080:8080"
     volumes:
-      # Read-only docker socket: how Traefik discovers the web/pocketbase labels.
+      # Read-only docker socket: how Traefik discovers the web labels.
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
@@ -69,7 +65,7 @@ services:
     labels:
       - "traefik.enable=true"
       # SPA catch-all for ANY host in the wildcard zone. Lowest priority so the
-      # /api/* proxies and /pb win. To pin the app to a single subdomain instead,
+      # /api/* proxies win. To pin the app to a single subdomain instead,
       # replace the rule with:  Host(`water3d.vistacompute1.ucmerced.edu`)
       - 'traefik.http.routers.w3d-web.rule=HostRegexp(`^[a-zA-Z0-9-]+\.vistacompute1\.ucmerced\.edu$`)'
       - "traefik.http.routers.w3d-web.priority=1"
@@ -77,34 +73,6 @@ services:
       - "traefik.http.routers.w3d-web.tls=true"
       - "traefik.http.routers.w3d-web.middlewares=security-headers@file,gzip@file"
       - "traefik.http.services.w3d-web.loadbalancer.server.port=80"
-
-  pocketbase:
-    image: ghcr.io/muchobien/pocketbase:latest  # pin a tag (e.g. :0.28.4) for reproducible prod builds
-    restart: unless-stopped
-    command:
-      - "serve"
-      - "--http=0.0.0.0:8090"
-      - "--dir=/pb/pb_data"
-      - "--migrationsDir=/pb/pb_migrations"
-    volumes:
-      - ../pocketbase/pb_migrations:/pb/pb_migrations:ro
-      - pb_data:/pb/pb_data
-    ports:
-      # Admin dashboard (/_/) — host loopback ONLY, never public.
-      #   ssh -L 8090:localhost:8090 <server>  →  http://localhost:8090/_/
-      - "127.0.0.1:8090:8090"
-    networks: [edge]
-    labels:
-      - "traefik.enable=true"
-      # /pb/* → PocketBase's own /api/* (handle_path-style prefix strip). Priority
-      # above the SPA catch-all, below the weather proxies.
-      - 'traefik.http.routers.w3d-pb.rule=HostRegexp(`^[a-zA-Z0-9-]+\.vistacompute1\.ucmerced\.edu$`) && PathPrefix(`/pb`)'
-      - "traefik.http.routers.w3d-pb.priority=50"
-      - "traefik.http.routers.w3d-pb.entrypoints=websecure"
-      - "traefik.http.routers.w3d-pb.tls=true"
-      - "traefik.http.routers.w3d-pb.middlewares=w3d-pb-strip@docker,security-headers@file,gzip@file"
-      - "traefik.http.middlewares.w3d-pb-strip.stripprefix.prefixes=/pb"
-      - "traefik.http.services.w3d-pb.loadbalancer.server.port=8090"
 
 networks:
   edge:
@@ -115,6 +83,5 @@ networks:
         # with the campus VPN (172.28.0.0/16). Host convention is 192.168.10x/24.
         - subnet: 192.168.105.0/24
 
-volumes:
-  pb_data:
-  # traefik_letsencrypt:   # only needed for the ACME (Let's Encrypt) alternative
+# volumes:
+#   traefik_letsencrypt:   # only needed for the ACME (Let's Encrypt) alternative

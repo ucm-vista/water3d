@@ -2,8 +2,7 @@
 #
 # Static SPA image for Water 3D — the Vite bundle served by nginx behind Traefik.
 #
-# Traefik terminates TLS and does all routing/proxying; PocketBase runs as its
-# own container now (stock image, see docker-compose.yml). This image is JUST
+# Traefik terminates TLS and does all routing/proxying. This image is JUST
 # the frontend. Build context is the REPO ROOT so the frontend source is in
 # scope. Rebuild whenever the frontend or the baked-in VITE_* values
 # (frontend/.env.production) change.

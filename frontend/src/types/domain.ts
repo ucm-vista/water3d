@@ -47,14 +47,6 @@ export interface FieldConfig {
   gddBaseTempC?: number;
   gddUpperTempC?: number;
   stageThresholds?: StageThreshold[];
-  soilTexture?: string;
-  awhcMmPerM?: number;
-  soilMapUnitKey?: string;
-  soilMapUnitName?: string;
-  soilComponentName?: string;
-  soilComponentPercent?: number;
-  hydrologicGroup?: string;
-  drainageClass?: string;
   rootDepthM?: number;
   madFraction?: number;
   irrigationEfficiency?: number;
@@ -70,9 +62,6 @@ export interface WeatherRecord {
   etoMm: number;
   forecastPetP10Mm?: number;
   forecastPetP90Mm?: number;
-  etActualMm?: number;
-  ndvi?: number;
-  modelCount?: number;
   source: WeatherSource;
   rhMin?: number;
   rhMax?: number;

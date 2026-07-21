@@ -2,7 +2,7 @@
 
 How raw units from each external API become the numbers on the dashboard, and
 where the data model has gaps. All compute is client-side (`frontend/src`);
-the only server is PocketBase (persistence/auth).
+fields and settings persist in the browser (`localStorage`).
 
 ---
 
@@ -34,36 +34,19 @@ the only server is PocketBase (persistence/auth).
 - **How we use it:** the *only* source of real hourly temps — drives chill-hour
   accounting over the dormant season.
 
-### OpenET (satellite ET, opt-in)
-- **URL:** `https://openet-api.org/raster/timeseries/point`
-- **Data:** actual ET · reference ETo · precipitation · ET fraction · NDVI ·
-  model count
-- **How we use it:** when enabled, satellite *actual* ET replaces the modeled
-  `ETo × Kc` estimate day-by-day; token-gated, off by default.
-
-### NRCS Soil Data Access / SSURGO (field setup)
-- **URL:** `https://sdmdataaccess.nrcs.usda.gov/Tabular/post.rest`
-- **Data:** soil texture · hydrologic group · drainage class · component
-  name/percent · available water holding capacity (AWHC)
-- **How we use it:** one-time context at field setup; AWHC and soil attributes
-  are stored on the field (not yet consumed by any calculation).
-
-### Mapbox (location, not measurement)
-- **URL:** `https://api.mapbox.com` (+ `mapbox://` styles)
+### Esri World Imagery + OSM Nominatim (location, not measurement)
+- **URL:** `https://server.arcgisonline.com` (tiles/export) ·
+  `https://nominatim.openstreetmap.org` (geocoding)
 - **Data:** satellite map tiles · static satellite images · place/address geocoding
 - **How we use it:** the field-picker map, field thumbnails, and address → lat/lon
-  — the coordinates that key every weather/ET/soil request.
-
-### PocketBase (backend)
-- **URL:** `https://water3d.vistacompute1.ucmerced.edu/pb` (prod)
-- **Data:** user accounts · saved fields · cached OpenET responses
-- **How we use it:** auth and persistence only — not a weather/measurement source.
+  — the coordinates that key every weather/ET request. Keyless (attribution
+  required), so the app needs no API tokens at all.
 
 ---
 
 ## 1. The pivot point: `WeatherRecord`
 
-Every weather/ET/soil provider normalizes its response into one shared shape,
+Every weather/ET provider normalizes its response into one shared shape,
 `WeatherRecord` (`frontend/src/types/domain.ts:65`). This is the single unit of
 data that all calculations consume — providers differ only in *which fields they
 populate* and *what units they had to convert from*.
@@ -73,12 +56,10 @@ populate* and *what units they had to convert from*.
 | `tminC` / `tmaxC` | °C | daily min/max air temp |
 | `precipMm` | mm | daily precipitation |
 | `etoMm` | mm | reference ET (grass) |
-| `etActualMm` | mm | satellite *actual* ET (OpenET only) |
 | `forecastPetP10Mm` / `P90Mm` | mm | forecast ET uncertainty band |
 | `rhMin` / `rhMax` | % | daily relative humidity range |
 | `tdewC` | °C | dew point |
 | `vpdKpa` | kPa | vapor pressure deficit |
-| `ndvi` | unitless (−1..1) | vegetation index |
 | `hourlyTempsC` | °C[] | 24 hourly temps (real or reconstructed) |
 | `source` | enum | `"historical"` \| `"forecast"` |
 
@@ -101,10 +82,8 @@ upstream path equals the endpoint path below. In prod, Traefik
 | gridMET | GET | `/api/gridmet/Services/get-netcdf-data/` | `https://toolbox-webservices.nkn.uidaho.edu/Services/get-netcdf-data/` |
 | Climate Toolbox CFS | GET | `/api/climate-toolbox/Services/get-cfs-data/` | `https://climate-dev.nkn.uidaho.edu/Services/get-cfs-data/` |
 | Open-Meteo | GET | `/api/open-meteo/v1/archive` | `https://archive-api.open-meteo.com/v1/archive` |
-| OpenET | POST | `/api/openet/raster/timeseries/point` | `https://openet-api.org/raster/timeseries/point` |
-| Soil Data Access | POST | `/api/soil-data-access/Tabular/post.rest` | `https://sdmdataaccess.nrcs.usda.gov/Tabular/post.rest` |
-| Mapbox | GET | *(direct, not proxied)* | `https://api.mapbox.com/...` |
-| PocketBase | REST | `/pb` (prod) | `https://water3d.vistacompute1.ucmerced.edu/pb` |
+| Esri World Imagery | GET | *(direct, not proxied)* | `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/...` |
+| OSM Nominatim | GET | *(direct, not proxied)* | `https://nominatim.openstreetmap.org/search` |
 
 ### gridMET — observed daily history (primary source)
 `config/gridmet.ts`, `api/gridMet.ts`. One HTTP request **per variable**
@@ -161,49 +140,17 @@ the **only source of *real* hourly temps** for chill accounting.
 | hourly `relative_humidity_2m` | % | daily min/max (`openMeteo.ts:90`) | `rhMin`/`rhMax` |
 | hourly `dew_point_2m` | °C | daily average (`:81`) | `tdewC` |
 
-### OpenET — satellite ET (opt-in, token-gated)
-`config/openet.ts`, `api/openEt.ts`. Model=Ensemble, reference=gridMET,
-`units=mm`, daily. Persisted in PocketBase `openet_cache`.
+### Esri World Imagery + OSM Nominatim — location, not measurement
+`config/map.ts`. Direct (not proxied), keyless. Three distinct endpoints:
 
-**Endpoint:** `POST /raster/timeseries/point` (via `/api/openet`), `Authorization`
-bearer token. Other endpoints are configured but unused: `/raster/timeseries/polygon`,
-`/raster/metadata`, `/account/status`, `/geodatabase/*` (`openet.ts:75`).
+- **Raster tiles** — MapLibre GL renders
+  `…/World_Imagery/MapServer/tile/{z}/{y}/{x}` (`FieldSetupMap.tsx`).
+- **Static thumbnails** — `GET …/World_Imagery/MapServer/export?bbox=…&f=image`
+  as an `<img>`, with the pin overlaid in CSS (`FieldMapThumbnail.tsx`).
+- **Geocoding** — `GET https://nominatim.openstreetmap.org/search` on Enter
+  (`LocationSearch.tsx`); the usage policy forbids per-keystroke autocomplete.
 
-| API variable | API unit | → field | Notably enables |
-|---|---|---|---|
-| `ET` | mm | `etActualMm` | **actual** ETc instead of `ETo×Kc` estimate |
-| `ETo` | mm | `etoMm` / `etReferenceMm` | reference overlays |
-| `PR` | mm | `precipMm` | — |
-| `ETof` | fraction | `etReferenceMm` | ET-fraction diagnostics |
-| `NDVI` | unitless | `ndvi` | canopy vigor context |
-| `MODEL_COUNT` | count | `modelCount` (quality) | ensemble confidence |
-
-### NRCS Soil Data Access / SSURGO — field setup only
-`config/soil.ts`, `api/soil.ts`. One SQL POST per coordinate; **not** a
-`WeatherRecord` — writes one-time attributes onto the `FieldConfig`.
-
-**Endpoint:** `POST /Tabular/post.rest` (via `/api/soil-data-access`),
-form-urlencoded body carrying a SQL query, `format=JSON+COLUMNNAME`
-(`soil.ts:174`, `config/soil.ts:5`).
-
-| API column | API unit | Transform | → `FieldConfig` |
-|---|---|---|---|
-| `awc_r` (horizon avail. water) | cm/cm | depth-weighted over root zone `Σ(awc·thick)/Σthick ·1000` (`soil.ts:76`) | `awhcMmPerM` (mm/m) |
-| texture / hydrologic group / drainage / component | text | — | `soilTexture`, `hydrologicGroup`, … |
-| — | — | default 100 cm root zone (`soil.ts:35`), AWHC fallback 150 | — |
-
-### Mapbox — location, not measurement
-`config/mapbox.ts`. Direct to Mapbox (not proxied), keyed by a public `pk.*`
-token. Three distinct endpoints:
-
-- **GL tiles** — `mapbox-gl` loads `mapbox://styles/mapbox/satellite-streets-v12`
-  (`FieldSetupMap.tsx:40`).
-- **Static Images** — `GET https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/<pin>/<lon>,<lat>,<zoom>/<size>?access_token=`
-  as an `<img>` thumbnail (`FieldMapThumbnail.tsx:16`).
-- **Search / Geocoding** — `@mapbox/search-js-react` `SearchBox` component hits
-  the Mapbox Search API (`FieldSidebar.tsx:94`, `SetupPanel.tsx:135`).
-
-Feeds `FieldConfig.lat/lon`, which key every weather/ET/soil request. Note:
+Feeds `FieldConfig.lat/lon`, which key every weather/ET request. Note:
 `elevationFt` is hardcoded `0` — never fetched.
 
 ---
@@ -216,23 +163,21 @@ flowchart TD
     GM["gridMET<br/>K, mm, kPa, %"]
     CT["Climate Toolbox CFS<br/>cumulative mm, K, kg/kg"]
     OM["Open-Meteo<br/>°C, mm, % (hourly)"]
-    OE["OpenET<br/>mm, NDVI"]
-    SDA["Soil Data Access<br/>cm/cm"]
-    MB["Mapbox<br/>lat/lon"]
+    MB["Esri + Nominatim<br/>lat/lon"]
   end
 
   subgraph Norm[api/ provider clients — normalize to metric]
     WR["WeatherRecord[]<br/>°C · mm · kPa · %"]
-    FC["FieldConfig<br/>soil + coords"]
+    FC["FieldConfig<br/>coords"]
   end
 
-  GM & CT & OM & OE --> WR
-  SDA & MB --> FC
+  GM & CT & OM --> WR
+  MB --> FC
 
   subgraph Calcs[calcs/ — pure math]
     GDD["dailyGdd / cumulativeGdd<br/>gdd.ts"]
     KC["interpolateKc<br/>kc.ts"]
-    ETC["ETc = etActualMm ?? etoMm·Kc<br/>analytics.ts"]
+    ETC["ETc = etoMm·Kc<br/>analytics.ts"]
     VPD["dailyMeanVpd<br/>vpd.ts"]
     CHILL["chillHours / chillPortions<br/>chillHours.ts, chill.ts"]
     STAGE["stage detection + projection<br/>gddSeries.ts, stageProjection.ts"]
@@ -261,8 +206,7 @@ For each day in the window `record.date >= field.stageStartDate` (biofix):
 2. **Season progress** = `cumulativeGdd / (final stage's GDD threshold)`.
 3. **Kc** = piecewise-linear interpolation of the crop's Kc curve at that
    progress.
-4. **ETc** = `record.etActualMm ?? record.etoMm × Kc` — uses satellite actual ET
-   when OpenET is on, otherwise the FAO-56 single-coefficient estimate.
+4. **ETc** = `record.etoMm × Kc` — the FAO-56 single-coefficient estimate.
 5. **Stage** = highest threshold whose GDD ≤ current cumulative; **next stage** =
    first threshold above it; unreached stages are **projected forward** using the
    climatological "normal" daily GDD by calendar day (cap 400 days,
@@ -289,9 +233,9 @@ effectively dead. This should be unified to one source of truth.
 
 ### B. Stored-but-unused irrigation model ⚠️
 `FieldConfig`/`CropProfile` persist `madFraction`, `tawMmPerM`, `rootDepthM`,
-`irrigationEfficiency`, and the SSURGO-derived `awhcMmPerM` — but **no
-soil-water-balance, depletion, MAD, or irrigation-scheduling calculation
-consumes them.** The data is collected and stored; the metric doesn't exist yet.
+and `irrigationEfficiency` — but **no soil-water-balance, depletion, MAD, or
+irrigation-scheduling calculation consumes them.** The data is collected and
+stored; the metric doesn't exist yet.
 
 ### C. Defined-but-unused stress thresholds
 `stress.frostCriticalC` and `stress.heatCriticalC` (`domain.ts:18`) are set per
@@ -373,17 +317,14 @@ a forecast artifact. *Verdict: right formula, wrong-vintage input.*
 - `hourlyTempsC` is *real* from Open-Meteo but *sine-reconstructed* for
   gridMET/forecast (`chillHours.ts:27`, `climate.ts:151`); chill hours from
   synthesized hours are smooth estimates nothing flags as modeled.
-- `ETc` per day is satellite **actual** ET when OpenET returns it, else **modeled**
-  `ETo×Kc` (`analytics.ts:29`). With OpenET gaps, one cumulative curve mixes the two
-  bases day-to-day. *Verdict: defensible but undisclosed basis-mixing.*
 
 **C.F — Humidity/VPD estimates assume sea-level pressure.**
 The specific-humidity→RH/dewpoint conversions hard-code `P = 101.3 kPa`
-(`climate.ts:128`) because `elevationFt` is hard-coded `0` (`soil.ts:207`). Biases
+(`climate.ts:128`) because `elevationFt` is hard-coded `0` (never fetched). Biases
 RH/VPD upward at elevation. *Verdict: small bias, grows with elevation.*
 
 **C.G — No supply side: precipitation & soil water are collected but unused.**
-`precipMm` is fetched from every provider, and `awhcMmPerM`/`tawMmPerM`/
+`precipMm` is fetched from every provider, and `tawMmPerM`/
 `madFraction`/`rootDepthM`/`irrigationEfficiency` are stored per field — but **no
 water-balance, depletion, or MAD calc consumes them** (`appliedWaterMm` is always
 `[]`, `computations.ts:37`). The app shows ET *demand* with no rainfall/irrigation
@@ -405,7 +346,7 @@ unusable as an irrigation signal on its own.*
 
 ### What is actually solid
 Kelvin→°C conversion; FAO-56 VPD pairing (RHmax·Tmin / RHmin·Tmax, `vpd.ts:19`);
-consistent use of **grass reference ETo** across gridMET/CFS/OpenET so `Kc×ETo` is
+consistent use of **grass reference ETo** across gridMET/CFS so `Kc×ETo` is
 dimensionally sound; cumulative-forecast de-accumulation (`climate.ts:57`); the
 chill-**hours** path (correct dormant window + real hourly temps); and the GDD
 double-cutoff itself is a recognized method.

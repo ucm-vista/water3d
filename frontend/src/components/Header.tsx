@@ -1,18 +1,13 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
-import type { AuthSession } from "../backend/authRepository";
 
 interface HeaderProps {
   activeView: string;
   canViewAnalytics: boolean;
-  authSession: AuthSession;
   onViewChange: (view: string) => void;
-  onLogin: (email: string, password: string) => Promise<void>;
-  onRegister: (email: string, password: string, passwordConfirm: string) => Promise<void>;
-  onLogout: () => void;
 }
 
-export function Header({ activeView, canViewAnalytics, authSession, onViewChange, onLogin, onRegister, onLogout }: HeaderProps) {
+export function Header({ activeView, canViewAnalytics, onViewChange }: HeaderProps) {
   const homeActive = activeView === "Home";
   const analyticsActive = activeView === "Analytics" && canViewAnalytics;
   // Home and Analytics aside, every remaining view renders the field manager, so
@@ -69,7 +64,6 @@ export function Header({ activeView, canViewAnalytics, authSession, onViewChange
         >
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
-        {/* Account button temporarily removed — auth wiring below stays in place for easy restore. */}
       </div>
     </header>
   );
