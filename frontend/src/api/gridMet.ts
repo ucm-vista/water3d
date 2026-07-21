@@ -23,7 +23,7 @@ function round(value: number, digits = 2): number {
   return Number(value.toFixed(digits));
 }
 
-function findSeriesTables(payload: unknown): Array<Record<string, unknown>> {
+export function findSeriesTables(payload: unknown): Array<Record<string, unknown>> {
   if (Array.isArray(payload)) {
     return payload.flatMap((item) => findSeriesTables(item));
   }

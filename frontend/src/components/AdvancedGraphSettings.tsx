@@ -337,28 +337,13 @@ export function AdvancedGraphSettings({
 
         {view === "chill" ? (
           <section className="settings-section">
-            <h3>Chill Thresholds</h3>
-            <p className="settings-hint">Hours are counted when the temperature falls between these bounds.</p>
-            <div className="settings-field-grid">
-              <label>
-                <span>Chill band min (°{tempSuffix})</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={celsiusToDisplayTemp(settings.chillThresholdMinC, unitSystem)}
-                  onChange={(event) => update({ chillThresholdMinC: displayTempToCelsius(Number(event.target.value), unitSystem) })}
-                />
-              </label>
-              <label>
-                <span>Chill band max (°{tempSuffix})</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={celsiusToDisplayTemp(settings.chillThresholdMaxC, unitSystem)}
-                  onChange={(event) => update({ chillThresholdMaxC: displayTempToCelsius(Number(event.target.value), unitSystem) })}
-                />
-              </label>
-            </div>
+            <h3>Chill Model</h3>
+            <p className="settings-hint">
+              Chill is accumulated with the Dynamic Model (Fishman–Erez), reported in Chill Portions. Observed chill and the P10–P90 normal band
+              (1979–2022 baseline) are precomputed by the Climate Toolbox and anchored to Oct 1; the band shows automatically when that data is
+              available, otherwise the observed line falls back to an on-device calculation from hourly temperatures. There is no adjustable
+              temperature band — the physiological response curve is fixed.
+            </p>
           </section>
         ) : null}
       </div>

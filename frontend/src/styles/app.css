@@ -1145,29 +1145,47 @@ dd {
   max-width: 1320px;
 }
 
-/* Home / about-style landing page. Reuses .content + .panel; these rules only
-   add the landing-specific layout on top of the shared framing. */
+/* Home / about-style landing page. Reuses the Analytics design language —
+   .content framing, .metrics-grid + MetricCard, .panel with .panel-title-row
+   (rust section marker), and the mono uppercase labels — so the landing page
+   reads as the same product as the dashboard. These rules only add the
+   landing-specific layout on top of that shared framing. */
 .home-content {
-  max-width: 1120px;
+  max-width: 1240px;
 }
 
 .home-tagline {
-  max-width: 720px;
+  max-width: 760px;
   font-size: 16px;
+}
+
+/* The "at a glance" stat row uses the analytics .metrics-grid; just tighten the
+   gap below it before the first content panel. */
+.home-stats {
+  margin-bottom: 20px;
 }
 
 .home-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  margin-bottom: 24px;
+  gap: 16px;
+  margin-top: 4px;
 }
 
+.home-compute-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Cards now sit *inside* a white .panel (rather than each being a panel), so
+   they take a soft cream fill + hairline border to read as nested tiles. */
 .home-card {
-  padding: 24px;
+  padding: 22px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  background: #fbf9f5;
+  border: 1px solid #e5e3dd;
+  border-radius: 4px;
 }
 
 .home-card h3 {
@@ -1188,11 +1206,59 @@ dd {
   border-radius: 8px;
   background: #f3dfd6;
   color: #934936;
+  flex-shrink: 0;
+}
+
+/* Computation tiles: icon + title on one row, a mono formula chip, then prose. */
+.home-compute-card {
+  gap: 12px;
+}
+
+.home-compute-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-compute-head .home-card-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+}
+
+.home-compute-head h3 {
+  margin: 0;
+}
+
+.home-formula {
+  display: block;
+  overflow-x: auto;
+  padding: 9px 11px;
+  border: 1px solid #e5e3dd;
+  border-left: 3px solid #934936;
+  border-radius: 3px;
+  background: #f5f3ef;
+  color: #061827;
+  font-family: Geist, ui-monospace, monospace;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Inline code references (/api, src/calcs) in the section subtitles. */
+.home-section p code {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #f0eeea;
+  color: #061827;
+  font-family: Geist, ui-monospace, monospace;
+  font-size: 12.5px;
+  font-weight: 700;
 }
 
 .home-section {
   padding: 28px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .home-section h2 {
@@ -1201,7 +1267,7 @@ dd {
 
 .home-crop-list {
   list-style: none;
-  margin: 16px 0 0;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
@@ -1226,22 +1292,30 @@ dd {
 }
 
 .home-source-list {
-  margin: 18px 0 0;
+  margin: 0;
   display: grid;
   gap: 14px;
 }
 
 .home-source-list div {
   display: grid;
-  grid-template-columns: minmax(160px, 220px) 1fr;
+  grid-template-columns: minmax(180px, 240px) 1fr;
   gap: 16px;
   align-items: baseline;
 }
 
 .home-source-list dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-family: Geist, ui-monospace, monospace;
   font-weight: 800;
   color: #061827;
+}
+
+.home-source-list dt svg {
+  flex-shrink: 0;
+  color: #934936;
 }
 
 .home-source-list dd {
@@ -1289,8 +1363,15 @@ dd {
   color: #061827;
 }
 
+@media (max-width: 1080px) {
+  .home-compute-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 720px) {
-  .home-grid {
+  .home-grid,
+  .home-compute-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -2126,6 +2207,14 @@ dd {
 .parameter-grid-pair {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 12px;
+}
+
+/* Keep both inputs on a shared baseline even when one label wraps to a
+   second line (e.g. "GDD upper cutoff (°C)"). The labels stretch to equal
+   height (grid default), the span fills the top space, and the input sits in
+   the auto bottom row so the two boxes align. */
+.parameter-grid-pair label {
+  grid-template-rows: 1fr auto;
 }
 
 .parameter-grid label {

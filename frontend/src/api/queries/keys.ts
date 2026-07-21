@@ -17,6 +17,8 @@ export const weatherKeys = {
     ["weather", "year", { lat: round6(lat), lon: round6(lon), year, profile }] as const,
   climatologyRaw: (lat: number, lon: number, startYear: number, endYear: number) =>
     ["weather", "climatology-raw", { lat: round6(lat), lon: round6(lon), startYear, endYear }] as const,
+  chillClimatology: (lat: number, lon: number, springYear: number) =>
+    ["weather", "chill-climatology", { lat: round6(lat), lon: round6(lon), springYear }] as const,
 };
 
 // A cheap, stable fingerprint of a weather series: it changes when the series

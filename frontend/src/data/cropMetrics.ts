@@ -20,7 +20,7 @@ export interface GddMetricConfig {
 
 export interface ChillMetricConfig {
   enabled: boolean;
-  unitLabel: "Chill Hours" | "Chill Portions";
+  unitLabel: "Chill Portions";
   thresholdMinC?: number;
   thresholdMaxC?: number;
   requirement?: number;
@@ -122,17 +122,15 @@ export const cropMetricProfiles: Record<CropId, CropMetricProfile> = {
     },
     chill: {
       enabled: true,
-      unitLabel: "Chill Hours",
-      thresholdMinC: 0,
-      thresholdMaxC: 7.2,
-      requirement: 500,
-      defaultStartRule: "previous-july-15",
+      unitLabel: "Chill Portions",
+      requirement: 65,
+      defaultStartRule: "previous-nov-01",
       confidence: "mock",
       sources: [
         {
           label: "UC ANR almond chill model notes",
           url: "https://fruitsandnuts.ucdavis.edu/almond-hull-split-prediction-model-0",
-          note: "Placeholder chill-hour requirement for UI development.",
+          note: "Chill Portion requirement is a provisional placeholder; accumulation uses the Dynamic Model (Fishman–Erez).",
         },
       ],
     },
@@ -165,7 +163,7 @@ export const cropMetricProfiles: Record<CropId, CropMetricProfile> = {
         },
       ],
     },
-    chill: { enabled: false, unitLabel: "Chill Hours", defaultStartRule: "none", confidence: "mock", sources: [] },
+    chill: { enabled: false, unitLabel: "Chill Portions", defaultStartRule: "none", confidence: "mock", sources: [] },
     comparisonYears: [2023, 2024, 2025],
     notes: ["CDD stage thresholds are midpoint values from OSU source ranges; Tbase/Tupper now use Paredes et al. 2025 table values."],
   },
@@ -199,11 +197,9 @@ export const cropMetricProfiles: Record<CropId, CropMetricProfile> = {
     },
     chill: {
       enabled: true,
-      unitLabel: "Chill Hours",
-      thresholdMinC: 0,
-      thresholdMaxC: 7.2,
-      requirement: 150,
-      defaultStartRule: "previous-july-15",
+      unitLabel: "Chill Portions",
+      requirement: 50,
+      defaultStartRule: "previous-nov-01",
       confidence: "mock",
       sources: [],
     },
@@ -240,11 +236,9 @@ export const cropMetricProfiles: Record<CropId, CropMetricProfile> = {
     },
     chill: {
       enabled: true,
-      unitLabel: "Chill Hours",
-      thresholdMinC: 0,
-      thresholdMaxC: 7.2,
-      requirement: 800,
-      defaultStartRule: "previous-july-15",
+      unitLabel: "Chill Portions",
+      requirement: 58,
+      defaultStartRule: "previous-nov-01",
       confidence: "mock",
       sources: [],
     },
@@ -283,7 +277,7 @@ export const cropMetricProfiles: Record<CropId, CropMetricProfile> = {
         },
       ],
     },
-    chill: { enabled: false, unitLabel: "Chill Hours", defaultStartRule: "none", confidence: "mock", sources: [] },
+    chill: { enabled: false, unitLabel: "Chill Portions", defaultStartRule: "none", confidence: "mock", sources: [] },
     comparisonYears: [2023, 2024, 2025],
     notes: ["Priority crop. Tbase/Tupper now come from Paredes et al. 2025. Existing stage thresholds are provisional because they were originally derived from DD60 guidance and need recalibration for Tbase 12C."],
   },
@@ -312,7 +306,7 @@ export const cropMetricProfiles: Record<CropId, CropMetricProfile> = {
         },
       ],
     },
-    chill: { enabled: false, unitLabel: "Chill Hours", defaultStartRule: "none", confidence: "mock", sources: [] },
+    chill: { enabled: false, unitLabel: "Chill Portions", defaultStartRule: "none", confidence: "mock", sources: [] },
     comparisonYears: [2023, 2024, 2025],
     notes: ["Tbase/Tupper now come from Paredes et al. 2025. Later implementation should support reset after each cutting."],
   },
@@ -329,7 +323,7 @@ export const cropMetricProfiles: Record<CropId, CropMetricProfile> = {
       stages: [],
       sources: [],
     },
-    chill: { enabled: false, unitLabel: "Chill Hours", defaultStartRule: "none", confidence: "mock", sources: [] },
+    chill: { enabled: false, unitLabel: "Chill Portions", defaultStartRule: "none", confidence: "mock", sources: [] },
     comparisonYears: [2023, 2024, 2025],
     notes: ["User-defined crop. Base/upper temperatures and growth stages are entered manually; no source-backed defaults apply."],
   },

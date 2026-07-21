@@ -57,6 +57,18 @@ export const API_REGISTRY: ApiRegistryEntry[] = [
       "Katherine to provide a pre-computed P10/P50/mean temperature endpoint to reduce API calls; drop it in behind the ClimatologyProvider seam (api/queries/climatology.ts).",
   },
   {
+    id: "chill-toolbox",
+    name: "Climate Toolbox precomputed chill",
+    role: "Chill view: observed daily Chill Portions (Dynamic Model) for the dormant season + the Oct1-anchored P10/P50/P90 normal band (1979–2022). Replaces the on-device Dynamic Model as the primary chill source; that model stays as a fallback.",
+    upstreamBaseUrl: gridMetConfig.baseUrl,
+    proxyPath: "/api/gridmet",
+    httpMethod: "GET",
+    configModule: "src/config/chillToolbox.ts",
+    providerModule: "src/api/chillClimate.ts",
+    owner: { org: "University of Idaho — Northwest Knowledge Network / Climate Toolbox", contact: "Katherine Hegewisch (Climate Toolbox API contact)" },
+    notes: "Same netCDF endpoint/proxy as gridMET. Observed file is year-versioned under a testing path (chill_portion_<springYear>.nc); band files are static climatology. Bands are keyed by day-of-season (placeholder year), aligned to observed by index-from-Oct-1.",
+  },
+  {
     id: "climate-toolbox-cfs",
     name: "Climate Toolbox CFSv2 forecast",
     role: "28-day, 48-member ensemble forecast extending the season forward; forecast GDD/ETc, the P10/P90 band, and projected stage dates.",
