@@ -3675,18 +3675,31 @@ dd {
   }
 }
 
-.chart-overlay-hint {
-  position: absolute;
-  top: 12px;
-  right: 14px;
-  z-index: 4;
-  padding: 5px 10px;
-  border: 1px solid #d8d5cf;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
+/* Dedicated slot in the legend row for comparison-overlay fetches: the chip sits
+   where the overlay legend entries will land once loaded, so it never covers the
+   plot. Dashed border marks it as a placeholder for incoming entries. */
+.legend-loading {
+  gap: 7px;
+  padding: 4px 10px;
+  border: 1px dashed #c4c6cc;
+  border-radius: 3px;
+  background: #f5f3ef;
   color: #687078;
+  font-family: Geist, ui-monospace, monospace;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.legend-loading svg {
+  animation: chart-spin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .legend-loading svg {
+    animation: none;
+  }
 }
 
 /* ---- Sidebar field name edit (pencil toggle) ---- */
