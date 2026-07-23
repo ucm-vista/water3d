@@ -1,6 +1,6 @@
 import type { GraphSeriesVisibility, GraphSettings } from "../components/graphSettings";
 import { MAX_COMPARISON_YEARS } from "../components/graphSettings";
-import type { EtChartMode, GddChartMode } from "../components/InlineMetricControls";
+import type { ChillModel, EtChartMode, GddChartMode } from "../components/InlineMetricControls";
 
 // Per-field chart/presentation preferences, persisted so a reload restores the
 // user's setup. Deliberately EXCLUDES gddBaseTempC/gddUpperTempC and stage
@@ -19,6 +19,7 @@ export interface FieldGraphPrefs {
   show?: Partial<GraphSeriesVisibility>;
   gddChartMode?: GddChartMode;
   etChartMode?: EtChartMode;
+  chillModel?: ChillModel;
 }
 
 export interface PreferencesRepository {
@@ -102,7 +103,7 @@ export function mergeGraphSettings(
 
 export function buildFieldPrefs(
   settings: GraphSettings,
-  modes: { gddChartMode: GddChartMode; etChartMode: EtChartMode },
+  modes: { gddChartMode: GddChartMode; etChartMode: EtChartMode; chillModel: ChillModel },
   cropId: string,
 ): FieldGraphPrefs {
   return {
@@ -117,5 +118,6 @@ export function buildFieldPrefs(
     show: settings.show,
     gddChartMode: modes.gddChartMode,
     etChartMode: modes.etChartMode,
+    chillModel: modes.chillModel,
   };
 }

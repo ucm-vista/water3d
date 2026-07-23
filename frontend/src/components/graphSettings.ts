@@ -68,9 +68,12 @@ export function buildDefaultGraphSettings(input: GraphSettingsDefaultsInput): Gr
       selectedYears: true,
       forecast: true,
       projection: true,
-      etReferencePriorYear: true,
-      etReferenceNormal: true,
-      etDailyBars: true,
+      // Reference-ETo overlays default off: once a crop is selected the chart
+      // should read as crop ET only (per Climate Toolbox review feedback) —
+      // these stay available as opt-ins under Advanced.
+      etReferencePriorYear: false,
+      etReferenceNormal: false,
+      etDailyBars: false,
       forecastBand: true,
       precipDailyBars: true,
       precipNormal: true,

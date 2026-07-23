@@ -7,7 +7,7 @@ import { useAutosave } from "../hooks/useAutosave";
 import type { FieldConfig } from "../types/domain";
 import { getCurrentYearStartDate } from "../utils/dateRange";
 import { cropOptionLabel } from "./CropSelect";
-import { CropField, GeneralInfoFields, SeasonGddFields, StageThresholdsFields } from "./FieldEditorForm";
+import { CropCoefficientField, CropField, GeneralInfoFields, SeasonGddFields, StageThresholdsFields } from "./FieldEditorForm";
 import { LocationSearch } from "./LocationSearch";
 
 const FieldSetupMap = lazy(() => import("./FieldSetupMap"));
@@ -149,6 +149,7 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, onGoHome, f
               <CropField draft={draft} onChange={setDraft} />
               <div className="config-card-divider" />
               <SeasonGddFields draft={draft} onChange={setDraft} />
+              <CropCoefficientField draft={draft} onChange={setDraft} />
             </section>
 
             <section className="config-card">

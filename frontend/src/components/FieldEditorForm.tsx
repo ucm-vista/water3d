@@ -1,5 +1,6 @@
 import { Plus, RotateCcw, Trash2 } from "lucide-react";
 import { getCropMetricProfile } from "../data/cropMetrics";
+import { cropProfiles } from "../data/crops";
 import { useUnits } from "../state/UnitsContext";
 import type { CropId, FieldConfig, StageThreshold } from "../types/domain";
 import { celsiusToDisplayTemp, displayTempToCelsius, tempUnitSuffix } from "../utils/units";
@@ -48,6 +49,7 @@ export function CropField({ draft, onChange }: FieldFieldsProps) {
       cropLabel: nextCropId === "other" ? "" : cropOptionLabel(nextCropId),
       gddBaseTempC: nextMetrics.gdd.baseTempC,
       gddUpperTempC: nextMetrics.gdd.upperTempC,
+      kcOverride: undefined,
       stageThresholds: undefined,
     });
   }
@@ -114,6 +116,37 @@ export function SeasonGddFields({ draft, onChange }: FieldFieldsProps) {
         </label>
       </div>
       <p className="editor-hint">Temperature thresholds for degree-day accumulation &mdash; not daily min/max temperatures.</p>
+    </>
+  );
+}
+
+// Crop coefficient (Kc) override. ETc = ETo × Kc; by default Kc follows the
+// research-paper stage curve for the crop, but reviewers asked that users be
+// able to see and set it themselves. Blank = use the built-in curve.
+export function CropCoefficientField({ draft, onChange }: FieldFieldsProps) {
+  const cropProfile = cropProfiles[draft.cropId];
+  const curveRange = cropProfile
+    ? `${Math.min(...cropProfile.kcCurve.map((point) => point.kc)).toFixed(2)}–${Math.max(...cropProfile.kcCurve.map((point) => point.kc)).toFixed(2)}`
+    : undefined;
+
+  return (
+    <>
+      <div className="parameter-grid parameter-grid-narrow">
+        <label>
+          <span>Crop coefficient (Kc)</span>
+          <input
+            type="number"
+            step="0.05"
+            min="0"
+            value={draft.kcOverride ?? ""}
+            placeholder={curveRange ? `Stage curve (${curveRange})` : "Stage curve"}
+            onChange={(event) => onChange({ ...draft, kcOverride: event.target.value === "" ? undefined : Math.max(0, Number(event.target.value)) })}
+          />
+        </label>
+      </div>
+      <p className="editor-hint">
+        Crop ET = reference ETo &times; Kc. Leave blank to follow the built-in stage-varying curve; enter a value to apply one flat Kc instead.
+      </p>
     </>
   );
 }
@@ -228,6 +261,7 @@ export function FieldEditorForm({ draft, onChange, includeName = true }: FieldEd
       <section className="editor-section">
         <h3>Season &amp; GDD Model</h3>
         <SeasonGddFields draft={draft} onChange={onChange} />
+        <CropCoefficientField draft={draft} onChange={onChange} />
       </section>
 
       <section className="editor-section">

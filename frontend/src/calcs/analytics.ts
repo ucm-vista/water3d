@@ -25,7 +25,8 @@ export function buildAnalyticsSnapshot(
   const records: DailyAnalytics[] = weatherWindow.map((record) => {
     const gdd = dailyGdd(record, effectiveCrop);
     cumulativeGddValue += gdd;
-    const kc = interpolateKc(effectiveCrop, seasonProgressFromGdd(effectiveCrop, cumulativeGddValue));
+    // A user-set flat Kc overrides the stage-varying curve (simple, transparent knob).
+    const kc = field.kcOverride ?? interpolateKc(effectiveCrop, seasonProgressFromGdd(effectiveCrop, cumulativeGddValue));
     const etcMm = Number((record.etoMm * kc).toFixed(1));
     cumulativeEtcMm += etcMm;
     cumulativeEtoMmValue += record.etoMm;
@@ -46,7 +47,7 @@ export function buildAnalyticsSnapshot(
   const numericStages = effectiveCrop.stages.filter((stage) => typeof stage.gdd === "number");
   const currentStage = numericStages.reduce((active, stage) => (typeof stage.gdd === "number" && currentGdd >= stage.gdd ? stage : active), numericStages[0] ?? effectiveCrop.stages[0]);
   const nextStage = numericStages.find((stage) => typeof stage.gdd === "number" && stage.gdd > currentGdd);
-  const currentKc = records.at(-1)?.kc ?? effectiveCrop.kcCurve[0].kc;
+  const currentKc = records.at(-1)?.kc ?? field.kcOverride ?? effectiveCrop.kcCurve[0].kc;
   const cumulativeEtoMm = Number(weatherWindow.reduce((total, record) => total + record.etoMm, 0).toFixed(1));
   const latestVpd = [...records].reverse().find((record) => typeof record.vpdKpa === "number")?.vpdKpa;
   const chillPortions = effectiveCrop.chillRequirementPortions ? (cumulativeChillPortions(weather).at(-1)?.cumulativePortions ?? 0) : undefined;
