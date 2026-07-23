@@ -27,7 +27,7 @@ export function GeneralInfoFields({ draft, onChange }: FieldFieldsProps) {
   }
 
   return (
-    <div className="parameter-grid">
+    <div className="parameter-grid parameter-grid-narrow">
       <label>
         <span>Field name</span>
         <input value={draft.name} onChange={(event) => patch({ name: event.target.value })} placeholder="e.g. West Orchard Sector 4" />

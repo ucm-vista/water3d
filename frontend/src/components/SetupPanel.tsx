@@ -1,4 +1,4 @@
-import { BookOpen, ChevronLeft, Info, ListChecks, MapPin } from "lucide-react";
+import { ChevronLeft, MapPin } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 import { cropOptions } from "../data/crops";
 import { getCropMetricProfile } from "../data/cropMetrics";
@@ -91,7 +91,10 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, onGoHome, f
               <ChevronLeft size={22} />
             </button>
           ) : null}
-          <h1>{isEditing ? "Edit Field Configuration" : "New Field Configuration"}</h1>
+          <div className="config-banner-title">
+            <span className="config-eyebrow">Field Setup</span>
+            <h1>{isEditing ? "Edit Field Configuration" : "New Field Configuration"}</h1>
+          </div>
         </div>
         <p className="config-banner-sub">{subtitle}</p>
         {isEditing ? null : (
@@ -110,19 +113,10 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, onGoHome, f
 
       <main className="content config-content">
         <div className="config-grid">
-          <div className="config-col">
-            <section className="config-card">
+          <section className="config-card config-card-map">
+            <div className="config-section">
               <div className="config-card-head">
-                <Info size={18} aria-hidden />
-                <h2>General Information</h2>
-              </div>
-              <GeneralInfoFields draft={draft} onChange={setDraft} />
-            </section>
-
-            <section className="config-card">
-              <div className="config-card-head">
-                <MapPin size={18} aria-hidden />
-                <h2>Field Location</h2>
+                <h2>Location</h2>
               </div>
               <p className="config-card-hint">Search for a ranch or drop a pin to bind the weather grid used for GDD and chill calculations.</p>
               <div className="field-search-control">
@@ -137,29 +131,41 @@ export function SetupPanel({ onCreateField, onUpdateField, onCancel, onGoHome, f
                 <MapPin size={14} />
                 {draft.lat.toFixed(5)}, {draft.lon.toFixed(5)}
               </p>
-            </section>
-          </div>
+            </div>
+          </section>
 
-          <div className="config-col">
-            <section className="config-card">
+          <section className="config-card config-card-data">
+            <div className="config-section">
               <div className="config-card-head">
-                <BookOpen size={18} aria-hidden />
-                <h2>Crop &amp; GDD Model</h2>
+                <h2>General Information</h2>
+              </div>
+              <GeneralInfoFields draft={draft} onChange={setDraft} />
+            </div>
+
+            <div className="config-section">
+              <div className="config-card-head">
+                <h2>Crop</h2>
               </div>
               <CropField draft={draft} onChange={setDraft} />
-              <div className="config-card-divider" />
+            </div>
+
+            <div className="config-section">
+              <div className="config-card-head">
+                <h2>Season &amp; GDD Model</h2>
+              </div>
               <SeasonGddFields draft={draft} onChange={setDraft} />
               <CropCoefficientField draft={draft} onChange={setDraft} />
-            </section>
+            </div>
+          </section>
 
-            <section className="config-card">
+          <section className="config-card config-card-stages">
+            <div className="config-section">
               <div className="config-card-head">
-                <ListChecks size={18} aria-hidden />
                 <h2>Growth Stage Thresholds</h2>
               </div>
               <StageThresholdsFields draft={draft} onChange={setDraft} heading={false} />
-            </section>
-          </div>
+            </div>
+          </section>
         </div>
       </main>
     </div>
