@@ -44,6 +44,7 @@ export function snapshotInputsHash(field: FieldConfig, crop: CropProfile): strin
     upper: field.gddUpperTempC ?? crop.tUpperC,
     stages: field.stageThresholds?.length ? field.stageThresholds : crop.stages,
     kc: crop.kcCurve,
+    kcOverride: field.kcOverride ?? null,
     chill: crop.chillRequirementPortions,
   });
 }

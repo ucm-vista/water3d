@@ -1,4 +1,4 @@
-import { CalendarClock, Download, Droplets, Gauge, Image as ImageIcon, Info, Sprout, ThermometerSun } from "lucide-react";
+import { CalendarClock, Download, Droplets, Gauge, Image as ImageIcon, Info, LoaderCircle, Sprout, ThermometerSun } from "lucide-react";
 import { Area, Bar, Customized, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useIsRestoring } from "@tanstack/react-query";
 import { climateToolboxApi } from "../api/climate";
@@ -15,7 +15,7 @@ import {
   useYearWeather,
 } from "../api/queries";
 import { buildAnalyticsSnapshot } from "../calcs/analytics";
-import { getChillSeasonStart } from "../calcs/chillHours";
+import { cumulativeChillHours, getChillSeasonStart } from "../calcs/chillHours";
 import { cumulativeChillPortions } from "../calcs/dynamicModel";
 import { splitSeasonSeries } from "../calcs/gddSeries";
 import { daysAheadOfNormal, findThresholdDate } from "../calcs/stageProjection";
@@ -38,8 +38,9 @@ import { useUnits } from "../state/UnitsContext";
 import { buildFieldPrefs, localPreferencesRepository, mergeGraphSettings } from "../utils/preferencesStorage";
 import { MetricCard } from "./MetricCard";
 import { AdvancedGraphSettings } from "./AdvancedGraphSettings";
-import { InlineMetricControls, type EtChartMode, type GddChartMode, type MetricView } from "./InlineMetricControls";
+import { InlineMetricControls, type ChillModel, type EtChartMode, type GddChartMode, type MetricView } from "./InlineMetricControls";
 import { ChartLoader } from "./ChartLoader";
+import { ChartHoverTooltip, type ChartTooltipRow } from "./ChartTooltip";
 import { buildDefaultGraphSettings, FORECAST_RANGE_OPTIONS, type GraphSettings } from "./graphSettings";
 
 // The forecast fetch always pulls the widest selectable window; the UI then
@@ -54,24 +55,24 @@ interface DashboardProps {
   onEditStages?: () => void;
 }
 
-// GDD chart series colors. Current year (observed history + its dashed
-// projection) reads bright red; the 30-year climatological normal (line and
-// median) reads bright aqua — a distinct hue from the current-season red and the
-// pale-blue P10–P90 band — and is labelled "Historical (30 year average)".
-// Series hues come from the validated bright categorical palette (dataviz skill,
-// validated on the white chart surface with the historical line dashed for CVD).
+// GDD chart series colors. The observed season (history + its dashed
+// projection) reads bright red; everything historical — the 30-year normal
+// line, its P10–P90 band tint, and the chill normal — shares one dark-blue
+// family so "historical context" is a single visual identity across views.
+// #2a5ea8 vs #e34948 validated with the dataviz palette script (all six checks
+// pass on the white chart surface).
 const GDD_CURRENT_COLOR = "#e34948";
-const GDD_NORMAL_COLOR = "#1baf7a";
-const GDD_NORMAL_BAND_COLOR = "#bcd3ea";
+const GDD_NORMAL_COLOR = "#2a5ea8";
+const GDD_NORMAL_BAND_COLOR = "#b9cde9";
 
 // Chill view: the observed line reuses the red current-season color; the
-// precomputed 1979–2022 normal band + P50 median read blue, mirroring the GDD
-// current-vs-normal contrast.
-const CHILL_NORMAL_COLOR = "#2a78d6";
+// precomputed 1979–2022 normal band + P50 median use the shared historical
+// dark blue, mirroring the GDD current-vs-normal contrast.
+const CHILL_NORMAL_COLOR = "#2a5ea8";
 
-// Optional prior-season overlays — bright palette hues held clear of the red
-// current-season line (blue / violet / green).
-const COMPARISON_YEAR_COLORS = ["#2a78d6", "#4a3aa7", "#008300"];
+// Optional prior-season overlays: neutral black by request — historical years
+// read as reference context, distinguished by tooltip/legend rather than hue.
+const COMPARISON_YEAR_COLORS = ["#111111"];
 
 function comparisonYearColor(index: number): string {
   return COMPARISON_YEAR_COLORS[index % COMPARISON_YEAR_COLORS.length];
@@ -84,21 +85,27 @@ function formatLatLon(lat: number, lon: number): string {
   return `${Math.abs(lat).toFixed(4)}° ${ns}, ${Math.abs(lon).toFixed(4)}° ${ew}`;
 }
 
-// Reference-ETo year-over-year overlays use a cooler (blue) palette so they read
-// as the "reference ETo" family yet stay distinct from the rust current-season
-// reference ETo line and the crop-ET / daily-bar colors.
-const ETO_COMPARISON_YEAR_COLORS = ["#5f8fc0", "#4f8a8b", "#8a86c9"];
-const ETO_NORMAL_COLOR = "#3f6486";
+// Reference-ETo overlays (normal + comparison years): neutral black, matching
+// the black historical-year overlays on the GDD chart — opt-in reference
+// context, distinguished by dash/legend rather than hue.
+const ETO_COMPARISON_YEAR_COLORS = ["#111111"];
+const ETO_NORMAL_COLOR = "#111111";
 // ET "water balance" view: crop ET (demand, bright red) vs precipitation
-// (supply, bright blue). The gap between them — the irrigation deficit — is a
+// (supply, dark blue). The gap between them — the ET − precip difference — is a
 // bold violet, a hue distinct from every line so the shortfall stands alone.
 const CROP_ET_COLOR = "#e34948";
-const PRECIP_NORMAL_COLOR = "#2a78d6";
-// Historical (30-yr) precipitation normal + band: bright aqua, matching the GDD
-// historical hue and distinct from the blue current-year supply line (drawn
-// dashed for CVD separation from the red demand line).
-const PRECIP_HISTORICAL_COLOR = "#1baf7a";
+const PRECIP_NORMAL_COLOR = "#2a5ea8";
+// Historical (30-yr) daily-average precipitation bars: a lighter step of the
+// same blue as this season's bars, so both read as one "precipitation" family
+// separated by lightness (#5f94cf validated against #2a5ea8 and #e34948).
+const PRECIP_HISTORICAL_COLOR = "#5f94cf";
 const WATER_DEFICIT_COLOR = "#4a3aa7";
+
+// Bar minPointSize callback: give any measurable rain a 2px-minimum stub so
+// trace amounts stay visible, while zero (dry) days draw nothing.
+function visibleRainStub(value: number | undefined | null): number {
+  return typeof value === "number" && value > 0 ? 2 : 0;
+}
 
 function etoComparisonYearColor(index: number): string {
   return ETO_COMPARISON_YEAR_COLORS[index % ETO_COMPARISON_YEAR_COLORS.length];
@@ -283,6 +290,9 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   // ET view renders one curve family at a time (reviewer feedback: crop ET and
   // reference ET on one chart read as clutter), plus a precipitation mode.
   const [etChartMode, setEtChartMode] = useState<EtChartMode>("cropEt");
+  // Chill view flips between Dynamic-Model portions and classic chill hours
+  // (the "flip-flop" asked for in review; hours use the crop's threshold band).
+  const [chillModel, setChillModel] = useState<ChillModel>("portions");
   const [exportingImage, setExportingImage] = useState(false);
   // Captured by the "Export Image" action (title + chart + legend → PNG).
   const chartPanelRef = useRef<HTMLElement>(null);
@@ -424,19 +434,21 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
     setView("gdd");
     setGddChartMode(prefs?.cropId === field.cropId ? (prefs?.gddChartMode ?? "cumulative") : "cumulative");
     setEtChartMode(prefs?.cropId === field.cropId ? (prefs?.etChartMode ?? "cropEt") : "cropEt");
+    setChillModel(prefs?.cropId === field.cropId ? (prefs?.chillModel ?? "portions") : "portions");
   }, [defaultSettings, field.id, field.cropId, field.stageStartDate, currentYear]);
 
   // Write-through persistence: any settings/mode change updates the stored
   // per-field preferences (small payload, so no debounce needed).
   useEffect(() => {
-    localPreferencesRepository.save(field.id, buildFieldPrefs(settings, { gddChartMode, etChartMode }, field.cropId));
-  }, [settings, gddChartMode, etChartMode, field.id, field.cropId]);
+    localPreferencesRepository.save(field.id, buildFieldPrefs(settings, { gddChartMode, etChartMode, chillModel }, field.cropId));
+  }, [settings, gddChartMode, etChartMode, chillModel, field.id, field.cropId]);
 
   function resetSettings() {
     localPreferencesRepository.clear(field.id);
     setSettings(defaultSettings);
     setGddChartMode("cumulative");
     setEtChartMode("cropEt");
+    setChillModel("portions");
   }
 
   const analysisField = useMemo(() => ({ ...field, stageStartDate: selectedStartDate }), [field, selectedStartDate]);
@@ -540,17 +552,29 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
     enabled: backgroundQueriesEnabled && cropMetrics.chill.enabled,
   });
   const chillPrecomputed = chillClimatology.data;
-  const chillUsesPrecomputed = Boolean(chillPrecomputed?.hasObserved);
+  // Precomputed portions (and their band) only apply in portions mode — chill
+  // hours are computed on-device against the user's threshold band.
+  const chillUsesPrecomputed = chillModel === "portions" && Boolean(chillPrecomputed?.hasObserved);
   // Only draw the band alongside the precomputed observed line so both share the
   // Oct-1 anchor (the band cannot be validly re-anchored to the fallback's Nov-1).
-  const chillShowBand = Boolean(chillPrecomputed?.hasObserved && chillPrecomputed?.hasBand);
+  const chillShowBand = chillUsesPrecomputed && Boolean(chillPrecomputed?.hasBand);
   const chillFallback = useChillSeries(chillWeatherRecords);
+  const chillHoursSeries = useMemo(
+    () =>
+      chillModel === "hours"
+        ? cumulativeChillHours(chillWeatherRecords, settings.chillThresholdMinC, settings.chillThresholdMaxC)
+        : [],
+    [chillModel, chillWeatherRecords, settings.chillThresholdMinC, settings.chillThresholdMaxC],
+  );
   const currentChillPortions = chillUsesPrecomputed
     ? chillPrecomputed?.currentCumulative ?? 0
     : chillFallback.at(-1)?.cumulativePortions ?? 0;
+  const currentChillHours = chillHoursSeries.at(-1)?.cumulativeChillHours ?? 0;
   const chillAccrualStart = chillUsesPrecomputed ? chillPrecomputed?.seasonStart : chillSeasonStart;
   const chillRequirement = cropMetrics.chill.requirement;
-  const chillPercent = chillRequirement ? Math.round((currentChillPortions / chillRequirement) * 100) : undefined;
+  // The stored requirement is in Chill Portions, so target/progress only make
+  // sense in portions mode.
+  const chillPercent = chillModel === "portions" && chillRequirement ? Math.round((currentChillPortions / chillRequirement) * 100) : undefined;
 
   // ---- Full calendar-year GDD chart (Jan 1 -> Dec 31) ----
   // Solid current season = observed history; the dashed projection carries the
@@ -648,6 +672,9 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   const etChartData = useMemo(() => {
     let cumulativeEto = 0;
     let cumulativePrecip = 0;
+    // Previous day's cumulative-mean normal precip, so we can difference it into a
+    // per-day normal (the climatology only ships the cumulative mean).
+    let prevPrecipNormalCumRaw: number | undefined;
     // Seam date: the last observed (non-forecast) day in the window. Its value is
     // written into BOTH the observed and forecast keys so the solid and dotted
     // Recharts lines share a point and render as one continuous curve.
@@ -664,6 +691,10 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
       const dailyPrecip = weather?.precipMm ?? 0;
       const etoNormal = etoNormalCumulativeByMonthDay.get(monthDay);
       const precipNormal = precipNormalCumulativeByMonthDay.get(monthDay);
+      // Per-day normal precip = today's cumulative-mean minus yesterday's.
+      const dailyPrecipNormalRaw =
+        precipNormal != null && prevPrecipNormalCumRaw != null ? Math.max(0, precipNormal - prevPrecipNormalCumRaw) : undefined;
+      if (precipNormal != null) prevPrecipNormalCumRaw = precipNormal;
       const dayStats = climatologyByMonthDay?.[monthDay];
       const comparisonEto = Object.fromEntries(
         selectedComparisonYears.map((year) => {
@@ -679,15 +710,16 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         dailyEtHistorical: isForecast ? undefined : Number((record.etcMm * etFactor).toFixed(2)),
         dailyEtForecast: isForecast ? Number((record.etcMm * etFactor).toFixed(2)) : undefined,
         cumulativeEt: cumulativeEtVal,
-        // Current-year lines split into a solid observed segment + a dotted
-        // forecast segment (same color), bridged at the seam day.
+        // The crop-ET line splits into a solid observed segment + a dotted
+        // forecast segment (same color), bridged at the seam day. Precipitation
+        // renders as stacked bars, so its keys are strictly exclusive — bars
+        // need no shared seam point, and one would double-stack that day.
         cumulativeEtObserved: isForecast ? undefined : cumulativeEtVal,
         cumulativeEtForecast: onForecastLine ? cumulativeEtVal : undefined,
         cumulativePrecipObserved: isForecast ? undefined : cumulativePrecipVal,
-        cumulativePrecipForecast: onForecastLine ? cumulativePrecipVal : undefined,
-        // Irrigation deficit = demand above supply, shaded from the precip line up
-        // to the crop-ET line (stacked base + span). Zero where rain exceeds ETc.
-        deficitBase: cumulativePrecipVal,
+        cumulativePrecipForecast: isForecast ? cumulativePrecipVal : undefined,
+        // ET − precip difference = demand above supply; feeds the tooltip's
+        // "demand − supply = gap" row. Zero where rain exceeds ETc.
         deficitSpan: Number(Math.max(0, cumulativeEtVal - cumulativePrecipVal).toFixed(2)),
         cumulativeEto: Number((cumulativeEto * etFactor).toFixed(2)),
         etoNormal: typeof etoNormal === "number" ? Number((etoNormal * etFactor).toFixed(2)) : undefined,
@@ -696,6 +728,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         ...comparisonEto,
         dailyPrecipHistorical: isForecast ? undefined : Number((dailyPrecip * etFactor).toFixed(2)),
         dailyPrecipForecast: isForecast ? Number((dailyPrecip * etFactor).toFixed(2)) : undefined,
+        dailyPrecipNormal: dailyPrecipNormalRaw != null ? Number((dailyPrecipNormalRaw * etFactor).toFixed(2)) : undefined,
         cumulativePrecip: cumulativePrecipVal,
         precipNormal: typeof precipNormal === "number" ? Number((precipNormal * etFactor).toFixed(2)) : undefined,
         precipNormalP10: dayStats ? Number((dayStats.precipCumP10 * etFactor).toFixed(2)) : undefined,
@@ -732,6 +765,14 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
   // span technique used by the ET/precip bands); the fallback carries only the
   // client Dynamic Model's observed line.
   const chillChartData = useMemo(() => {
+    if (chillModel === "hours") {
+      return chillHoursSeries.map((record) => ({
+        date: formatDateLabel(record.date),
+        fullDate: record.date,
+        daily: record.chillHours as number | undefined,
+        current: record.cumulativeChillHours as number | undefined,
+      }));
+    }
     if (chillUsesPrecomputed && chillPrecomputed) {
       return chillPrecomputed.days.map((day) => ({
         date: formatDateLabel(day.date),
@@ -745,7 +786,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
       }));
     }
     return chillSeriesData(chillFallback);
-  }, [chillUsesPrecomputed, chillPrecomputed, chillFallback]);
+  }, [chillModel, chillHoursSeries, chillUsesPrecomputed, chillPrecomputed, chillFallback]);
 
   const chartData = view === "et" ? etChartData : view === "chill" ? chillChartData : gddView;
 
@@ -787,7 +828,12 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
 
   function formatEt(valueMm: number | undefined): string {
     if (typeof valueMm !== "number") return "--";
-    return `${(valueMm * etFactor).toFixed(etUnit === "in" ? 1 : 0)} ${etLabel}`;
+    return `${formatEtNumber(valueMm)} ${etLabel}`;
+  }
+
+  // Bare number (no unit label) for composing expressions like "22.4 − 13.1 in".
+  function formatEtNumber(valueMm: number): string {
+    return (valueMm * etFactor).toFixed(etUnit === "in" ? 1 : 0);
   }
 
   function formatStageDate(projection: { status: string; date?: string } | undefined): string {
@@ -798,13 +844,15 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
 
   function handleExportCsv() {
     const chillByDate =
-      chillUsesPrecomputed && chillPrecomputed
-        ? new Map(
-            chillPrecomputed.days
-              .filter((day) => day.cumulativePortions !== null)
-              .map((day) => [day.date, day.cumulativePortions as number]),
-          )
-        : new Map(chillFallback.map((record) => [record.date, record.cumulativePortions]));
+      chillModel === "hours"
+        ? new Map(chillHoursSeries.map((record) => [record.date, record.cumulativeChillHours]))
+        : chillUsesPrecomputed && chillPrecomputed
+          ? new Map(
+              chillPrecomputed.days
+                .filter((day) => day.cumulativePortions !== null)
+                .map((day) => [day.date, day.cumulativePortions as number]),
+            )
+          : new Map(chillFallback.map((record) => [record.date, record.cumulativePortions]));
     const tempSuffix = tempUnitSuffix(unitSystem);
     const columns = [
       { key: "date", label: "Date" },
@@ -821,7 +869,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
       { key: "cumulativePrecip", label: `Cumulative Precipitation (${etLabel})` },
       ...selectedComparisonYears.map((year) => ({ key: `year${year}`, label: `${year} Cumulative ${unitLabel}` })),
       ...selectedComparisonYears.map((year) => ({ key: `year${year}Eto`, label: `${year} Cumulative Reference ETo (${etLabel})` })),
-      ...(cropMetrics.chill.enabled ? [{ key: "chill", label: "Cumulative Chill Portions" }] : []),
+      ...(cropMetrics.chill.enabled ? [{ key: "chill", label: chillModel === "hours" ? "Cumulative Chill Hours" : "Cumulative Chill Portions" }] : []),
     ];
 
     let cumulativePrecipMm = 0;
@@ -923,13 +971,12 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
       legendItems.push({
         label: "Historical (30 year average, daily)",
         color: GDD_NORMAL_COLOR,
-        dashed: true,
         source: "Average daily GDD on each calendar day across the previous 30 seasons of gridMET temperatures.",
       });
   } else if (view === "gdd") {
     if (show.currentSeason)
       legendItems.push({
-        label: "Current Year (observed)",
+        label: "Observed",
         color: GDD_CURRENT_COLOR,
         source:
           "Growing degree days accumulated from gridMET daily min/max air temperature, using the averaging method capped at the crop's base and upper thresholds.",
@@ -946,7 +993,6 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
       legendItems.push({
         label: "Historical (30 year average)",
         color: GDD_NORMAL_COLOR,
-        dashed: true,
         source: "Average cumulative GDD on each calendar day across the previous 30 seasons of gridMET temperatures.",
       });
     if (show.climatologyBand)
@@ -958,66 +1004,163 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
     if (show.selectedYears)
       selectedComparisonYears.forEach((year, index) =>
         legendItems.push({
-          label: `${year}`,
+          label: `Historical (${year})`,
           color: comparisonYearColor(index),
           source: `Cumulative GDD for the ${year} season from gridMET historical temperatures.`,
         }),
       );
   } else if (view === "chill") {
     legendItems.push({
-      label: "Current Chill",
+      label: "Observed",
       color: GDD_CURRENT_COLOR,
-      source: chillUsesPrecomputed
-        ? "Cumulative Chill Portions (Dynamic Model, Fishman–Erez) precomputed by the Climate Toolbox from gridMET, accumulated from Oct 1."
-        : "Cumulative Chill Portions from the Dynamic Model (Fishman–Erez), computed on hourly temperatures this dormant season.",
+      source:
+        chillModel === "hours"
+          ? "Cumulative Chill Hours: hours spent inside the threshold band each day (from hourly temperatures, or a sinusoidal min/max approximation) this dormant season."
+          : chillUsesPrecomputed
+            ? "Cumulative Chill Portions (Dynamic Model, Fishman–Erez) precomputed by the Climate Toolbox from gridMET, accumulated from Oct 1."
+            : "Cumulative Chill Portions from the Dynamic Model (Fishman–Erez), computed on hourly temperatures this dormant season.",
     });
     if (chillShowBand)
       legendItems.push({
-        label: `Normal P10–P90 band (${chillPrecomputed?.baselineLabel})`,
+        label: `Historical P10–P90 band (${chillPrecomputed?.baselineLabel})`,
         color: CHILL_NORMAL_COLOR,
-        source: `The middle 80% of cumulative chill-portion outcomes across the ${chillPrecomputed?.baselineLabel} baseline, with the median (P50) as a fine dotted line — context for how this dormant season compares.`,
+        source: `The middle 80% of cumulative chill-portion outcomes across the ${chillPrecomputed?.baselineLabel} baseline, with the median (P50) as a fine solid line — context for how this dormant season compares.`,
       });
-    if (chillRequirement) legendItems.push({ label: "Chill Target", color: "#4a7c59", dashed: true });
+    if (chillModel === "portions" && chillRequirement) legendItems.push({ label: "Chill Target", color: "#4a7c59", dashed: true });
   } else {
-    // ET view: one combined water-balance chart — crop demand vs rain supply,
-    // with the gap between them as the irrigation deficit.
+    // ET view: dual-axis chart — cumulative crop-ET demand (line, left axis) vs
+    // daily precipitation supply (bars, right axis). Hover surfaces the deficit.
     legendItems.push({
-      label: "Crop ET (demand)",
+      label: "Crop ET (demand, cumulative)",
       color: CROP_ET_COLOR,
       source:
-        "Cumulative crop ET (ETc): reference ETo × the crop coefficient (Kc) for the current growth stage — the water the crop uses.",
+        "Cumulative crop ET (ETc) on the left axis: reference ETo × the crop coefficient (Kc) for the current growth stage — the water the crop uses.",
     });
     legendItems.push({
-      label: "Precipitation (supply)",
+      label: "Precipitation (daily)",
       color: PRECIP_NORMAL_COLOR,
-      source: "Cumulative precipitation from gridMET daily totals, extended with the Climate Toolbox CFS forecast — the water that fell on the field.",
-    });
-    if (forecastVisible)
-      legendItems.push({
-        label: "Forecast (current-year, dotted)",
-        color: "#687078",
-        dashed: true,
-        source: "Where the current-year crop-ET and precipitation lines continue past the last observed day, both drawn dotted in their own color across the Climate Toolbox CFS forecast window.",
-      });
-    legendItems.push({
-      label: "Irrigation deficit",
-      color: WATER_DEFICIT_COLOR,
-      source: "The shaded gap between crop demand (ETc) and precipitation supply — roughly the water you must add through irrigation.",
+      source: "Daily precipitation bars from gridMET daily totals on the right axis, extended with the Climate Toolbox CFS forecast (lighter bars) — the rain that fell on the field each day.",
     });
     if (show.precipNormal)
       legendItems.push({
-        label: "Precipitation — Historical (30 year average)",
+        label: "Precipitation — Historical (30-yr daily avg)",
         color: PRECIP_HISTORICAL_COLOR,
-        dashed: true,
-        source: "Average cumulative precipitation on each calendar day across the previous 30 seasons of gridMET history — the “normal” water supply for this field.",
+        source: "Average daily precipitation on each calendar day across the previous 30 seasons of gridMET history, drawn as bars beside this season's — the “normal” daily rain for this field.",
       });
-    if (show.precipBand)
+    if (show.etReferenceNormal)
       legendItems.push({
-        label: "Precipitation — Historical P10–P90 band",
-        color: PRECIP_HISTORICAL_COLOR,
-        source: "The middle 80% of cumulative precipitation outcomes across the previous 30 seasons — context for whether this is a wet or dry year.",
+        label: "Reference ETo — 30-yr normal",
+        color: ETO_NORMAL_COLOR,
+        dashed: true,
+        source: "Average cumulative reference ETo on each calendar day across the previous 30 seasons of gridMET history — opt-in context from Advanced settings.",
+      });
+    if (show.etReferencePriorYear && selectedComparisonYears.length)
+      legendItems.push({
+        label: `Reference ETo — ${selectedComparisonYears.join(", ")}`,
+        color: etoComparisonYearColor(0),
+        source: "Cumulative reference ETo for the selected comparison years — opt-in context from Advanced settings.",
+      });
+    if (show.etDailyBars)
+      legendItems.push({
+        label: "Crop ET (daily)",
+        color: CROP_ET_COLOR,
+        source: "Daily crop-ET bars (right axis) beside the precipitation bars — opt-in from Advanced settings.",
+      });
+    if (forecastVisible)
+      legendItems.push({
+        label: "Forecast (current-year)",
+        color: "#687078",
+        dashed: true,
+        source: "Past the last observed day, the crop-ET line turns dotted and this season's precipitation bars lighten, across the Climate Toolbox CFS forecast window.",
       });
   }
+
+  // Hover-tooltip rows, assembled in reading order (main series first, opt-in
+  // overlays after, the derived Difference last behind a hairline) instead of
+  // Recharts' render order. Row colors mirror the series exactly; labels stay
+  // in secondary ink and the value is the strong element.
+  const resolveEtTooltipRows = (payload: any[]): ChartTooltipRow[] => {
+    const byKey = new Map(payload.map((entry: any) => [String(entry.dataKey), entry]));
+    const point: any = payload[0]?.payload ?? {};
+    const fmt = (value: unknown) => `${Number(value).toFixed(2)} ${etLabel}`;
+    const rows: ChartTooltipRow[] = [];
+    const etObserved = byKey.get("cumulativeEtObserved");
+    const etForecast = byKey.get("cumulativeEtForecast");
+    // Seam day carries both keys; show the observed row only.
+    if (etObserved?.value != null) rows.push({ key: "et", label: "Crop ET (cumulative)", value: fmt(etObserved.value), color: CROP_ET_COLOR });
+    else if (etForecast?.value != null) rows.push({ key: "et", label: "Crop ET (forecast)", value: fmt(etForecast.value), color: CROP_ET_COLOR, dashed: true });
+    const precipObserved = byKey.get("dailyPrecipHistorical");
+    const precipForecast = byKey.get("dailyPrecipForecast");
+    if (precipObserved?.value != null) rows.push({ key: "precip", label: "Precipitation (daily)", value: fmt(precipObserved.value), color: PRECIP_NORMAL_COLOR });
+    else if (precipForecast?.value != null) rows.push({ key: "precip", label: "Precipitation (daily, forecast)", value: fmt(precipForecast.value), color: PRECIP_NORMAL_COLOR, dashed: true });
+    const precipNormal = byKey.get("dailyPrecipNormal");
+    if (precipNormal?.value != null) rows.push({ key: "precipNormal", label: "Historical precip (30-yr avg)", value: fmt(precipNormal.value), color: PRECIP_HISTORICAL_COLOR });
+    const dailyEt = byKey.get("dailyEtHistorical");
+    const dailyEtForecast = byKey.get("dailyEtForecast");
+    if (dailyEt?.value != null) rows.push({ key: "dailyEt", label: "Crop ET (daily)", value: fmt(dailyEt.value), color: CROP_ET_COLOR });
+    else if (dailyEtForecast?.value != null) rows.push({ key: "dailyEt", label: "Crop ET (daily, forecast)", value: fmt(dailyEtForecast.value), color: CROP_ET_COLOR, dashed: true });
+    const etoNormal = byKey.get("etoNormal");
+    if (etoNormal?.value != null) rows.push({ key: "etoNormal", label: "Reference ETo — 30-yr normal", value: fmt(etoNormal.value), color: ETO_NORMAL_COLOR, dashed: true });
+    for (const entry of payload) {
+      const match = String(entry.dataKey).match(/^year(\d{4})Eto$/);
+      if (match && entry.value != null)
+        rows.push({ key: String(entry.dataKey), label: `Reference ETo — ${match[1]}`, value: fmt(entry.value), color: ETO_COMPARISON_YEAR_COLORS[0] });
+    }
+    if (byKey.has("deficitSpan") && point.cumulativeEt != null && point.cumulativePrecip != null && point.cumulativeEt > point.cumulativePrecip) {
+      rows.push({
+        key: "difference",
+        label: "Difference (ET − precip)",
+        value: fmt(point.cumulativeEt - point.cumulativePrecip),
+        color: WATER_DEFICIT_COLOR,
+        divider: true,
+        detail: `${Number(point.cumulativeEt).toFixed(2)} − ${Number(point.cumulativePrecip).toFixed(2)} to date`,
+      });
+    }
+    return rows;
+  };
+
+  const resolveGddDailyTooltipRows = (payload: any[]): ChartTooltipRow[] => {
+    const fmt = (value: unknown) => `${Number(value).toFixed(1)} ${unitLabel}`;
+    const rows: ChartTooltipRow[] = [];
+    for (const entry of payload) {
+      if (entry.value == null) continue;
+      if (entry.dataKey === "dailyGddHistorical") rows.push({ key: "daily", label: "Daily GDD", value: fmt(entry.value), color: GDD_CURRENT_COLOR });
+      else if (entry.dataKey === "dailyGddForecast") rows.push({ key: "forecast", label: "Daily GDD (forecast)", value: fmt(entry.value), color: "#eb6834" });
+      else if (entry.dataKey === "normalDaily") rows.push({ key: "normal", label: "30-year average", value: fmt(entry.value), color: GDD_NORMAL_COLOR });
+    }
+    return rows;
+  };
+
+  const resolveCumulativeTooltipRows = (payload: any[]): ChartTooltipRow[] => {
+    const byKey = new Map(payload.map((entry: any) => [String(entry.dataKey), entry]));
+    const point: any = payload[0]?.payload ?? {};
+    const fmt = (value: unknown) => Number(value).toFixed(1);
+    const rows: ChartTooltipRow[] = [];
+    const current = byKey.get("current");
+    if (current?.value != null) rows.push({ key: "current", label: "Observed (to date)", value: fmt(current.value), color: GDD_CURRENT_COLOR });
+    const projected = byKey.get("projected");
+    if (projected?.value != null) rows.push({ key: "projected", label: "Forecast", value: fmt(projected.value), color: GDD_CURRENT_COLOR, dashed: true });
+    const normal = byKey.get("normal");
+    if (normal?.value != null) rows.push({ key: "normal", label: "30-year average", value: fmt(normal.value), color: GDD_NORMAL_COLOR });
+    const median = byKey.get("normalP50") ?? byKey.get("chillNormalP50");
+    if (median?.value != null)
+      rows.push({ key: "median", label: "30-year median (P50)", value: fmt(median.value), color: view === "chill" ? CHILL_NORMAL_COLOR : GDD_NORMAL_COLOR, dashed: view !== "chill" });
+    const range = byKey.get("normalRange");
+    if (Array.isArray(range?.value) && range.value[0] != null && range.value[1] != null)
+      rows.push({ key: "range", label: "30-year range (P10–P90)", value: `${fmt(range.value[0])} – ${fmt(range.value[1])}`, color: GDD_NORMAL_BAND_COLOR });
+    if (byKey.has("chillNormalP10") && point.chillNormalP10 != null && point.chillNormalBandSpan != null)
+      rows.push({
+        key: "range",
+        label: "30-year range (P10–P90)",
+        value: `${fmt(point.chillNormalP10)} – ${fmt(point.chillNormalP10 + point.chillNormalBandSpan)}`,
+        color: CHILL_NORMAL_COLOR,
+      });
+    for (const entry of payload) {
+      const match = String(entry.dataKey).match(/^year(\d{4})$/);
+      if (match && entry.value != null) rows.push({ key: String(entry.dataKey), label: `Historical (${match[1]})`, value: fmt(entry.value), color: COMPARISON_YEAR_COLORS[0] });
+    }
+    return rows;
+  };
 
   const renderStageLabels = (rcProps: {
     width?: number;
@@ -1031,8 +1174,10 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         ? `${cropDisplayName} daily GDD accumulation this season, with the 30-yr average`
         : `${cropDisplayName} cumulative GDD across ${currentYear}, with last year and the 30-yr normal`
       : view === "chill"
-        ? `${cropDisplayName} cumulative chill portions this dormant season${chillShowBand ? `, with the ${chillPrecomputed?.baselineLabel} normal band` : ""}`
-        : `${cropDisplayName} water balance this season — crop demand (ETc) vs precipitation supply; the shaded gap is the irrigation deficit`;
+        ? chillModel === "hours"
+          ? `${cropDisplayName} cumulative chill hours this dormant season, counted inside the ${celsiusToDisplayTemp(settings.chillThresholdMinC, unitSystem)}–${celsiusToDisplayTemp(settings.chillThresholdMaxC, unitSystem)}°${tempUnitSuffix(unitSystem)} band`
+          : `${cropDisplayName} cumulative chill portions this dormant season${chillShowBand ? `, with the ${chillPrecomputed?.baselineLabel} normal band` : ""}`
+        : `${cropDisplayName} water balance this season — cumulative crop demand (ETc, left axis) vs daily precipitation (bars, right axis); hover any day for the ET − precipitation difference`;
 
   const metricCards =
     view === "gdd"
@@ -1070,19 +1215,32 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
         ? [
             {
               label: "Chill Accrued",
-              value: chillUsesPrecomputed || chillWeatherRecords.length ? `${currentChillPortions.toFixed(1)} CP` : "Pending",
+              value:
+                chillModel === "hours"
+                  ? chillWeatherRecords.length
+                    ? `${Math.round(currentChillHours).toLocaleString()} hrs`
+                    : "Pending"
+                  : chillUsesPrecomputed || chillWeatherRecords.length
+                    ? `${currentChillPortions.toFixed(1)} CP`
+                    : "Pending",
               detail: chillAccrualStart ? `Since ${formatDateLabel(chillAccrualStart)}` : "Dormant season",
               icon: ThermometerSun,
-              info: chillUsesPrecomputed
-                ? `Cumulative Chill Portions (Dynamic Model, Fishman–Erez) precomputed by the Climate Toolbox and accumulated from Oct 1. Normal band baseline ${chillPrecomputed?.baselineLabel}.`
-                : "Cumulative Chill Portions from the Dynamic Model (Fishman–Erez), computed on hourly temperatures this dormant season.",
+              info:
+                chillModel === "hours"
+                  ? "Cumulative Chill Hours: hours per day spent inside the crop's threshold band, from hourly temperatures (or a sinusoidal min/max approximation) this dormant season."
+                  : chillUsesPrecomputed
+                    ? `Cumulative Chill Portions (Dynamic Model, Fishman–Erez) precomputed by the Climate Toolbox and accumulated from Oct 1. Normal band baseline ${chillPrecomputed?.baselineLabel}.`
+                    : "Cumulative Chill Portions from the Dynamic Model (Fishman–Erez), computed on hourly temperatures this dormant season.",
             },
             {
               label: "Requirement",
-              value: chillRequirement ? `${chillRequirement.toLocaleString()} CP` : "n/a",
-              detail: "Crop chill need",
+              value: chillModel === "portions" && chillRequirement ? `${chillRequirement.toLocaleString()} CP` : "n/a",
+              detail: chillModel === "portions" ? "Crop chill need" : "Defined in Chill Portions",
               icon: Gauge,
-              info: "Approximate Chill Portion requirement for this crop profile.",
+              info:
+                chillModel === "portions"
+                  ? "Approximate Chill Portion requirement for this crop profile."
+                  : "This crop's chill requirement is recorded in Chill Portions; switch to the Chill Portions model to track it.",
             },
             {
               label: "Progress",
@@ -1108,13 +1266,26 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
               info: "Cumulative precipitation to date, accumulated from gridMET daily totals over the season window.",
             },
             {
-              label: "Irrigation deficit",
+              // "Difference", not "deficit": without knowing what was irrigated we
+              // only know demand minus rain, not how far behind the field actually is.
+              label: "Difference (ET − precip)",
+              // The computed gap is the headline; the subtraction it came from
+              // sits in the detail line.
               value: seasonQuery.hasDetails && snapshot.records.length
                 ? `${observedEtc - observedPrecipMm >= 0 ? "" : "−"}${formatEt(Math.abs(observedEtc - observedPrecipMm))}`
                 : "Pending",
-              detail: observedEtc - observedPrecipMm >= 0 ? "Demand above rainfall" : "Rain above demand",
+              detail: seasonQuery.hasDetails && snapshot.records.length
+                ? `${formatEtNumber(observedEtc)} − ${formatEtNumber(observedPrecipMm)} ${etLabel}`
+                : "Demand minus rainfall",
               icon: Sprout,
-              info: "Crop demand (ETc) minus precipitation supply to date — roughly the water you must add through irrigation. A negative value means rain has exceeded demand.",
+              info: "Crop demand (ETc) minus precipitation supply to date — the theoretical amount to cover through irrigation, since actual irrigation applied is unknown here. A negative value means rain has exceeded demand.",
+            },
+            {
+              label: "Forecast ET",
+              value: forecastAvailable && seasonQuery.hasDetails && snapshot.records.length ? `+${formatEt(forecastEtcMm)}` : "Unavailable",
+              detail: forecastAvailable ? `Next ${forecastDays} days` : "No forecast loaded",
+              icon: CalendarClock,
+              info: "Additional crop ET (ETc) expected across the forecast window beyond today — forecast reference ETo × the crop coefficient (Kc).",
             },
           ];
 
@@ -1181,6 +1352,8 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
             onChange={setSettings}
             chillRequirement={chillRequirement}
             gddChartMode={gddChartMode}
+            chillModel={chillModel}
+            onChillModelChange={setChillModel}
             onGddChartModeChange={setGddChartMode}
             onOpenAdvanced={() => setAdvancedOpen(true)}
           />
@@ -1189,56 +1362,100 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
             {chartReady ? (
               <ResponsiveContainer width="100%" height="100%">
                 {view === "et" ? (
-                  <ComposedChart data={etChartData} margin={{ top: 28, right: 24, bottom: 16, left: 12 }}>
+                  <ComposedChart data={etChartData} margin={{ top: 28, right: 8, bottom: 16, left: 12 }}>
                     <XAxis dataKey="date" tickLine={false} axisLine={false} minTickGap={28} tick={{ fontSize: 11 }} height={42} />
-                    <YAxis yAxisId="cumulative" tickLine={false} axisLine={false} width={58} tickMargin={8} tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      contentStyle={{ background: "#ffffff", border: "1px solid #9fa89d", borderRadius: 3, color: "#061827", fontWeight: 800 }}
-                      formatter={(value, name, entry: any) => {
-                        const labels: Record<string, string> = {
-                          cumulativeEtObserved: "Crop ET (demand)",
-                          cumulativeEtForecast: "Crop ET (forecast)",
-                          cumulativePrecipObserved: "Precipitation (supply)",
-                          cumulativePrecipForecast: "Precipitation (forecast)",
-                          deficitSpan: "Irrigation deficit",
-                          precipNormal: "Precipitation — Historical (30 year average)",
-                        };
-                        // On the seam day both observed and forecast keys carry a value;
-                        // drop the redundant forecast row so it isn't listed twice.
-                        if (
-                          (name === "cumulativeEtForecast" && entry?.payload?.cumulativeEtObserved != null) ||
-                          (name === "cumulativePrecipForecast" && entry?.payload?.cumulativePrecipObserved != null)
-                        )
-                          return ["", ""] as [string, string];
-                        // Render a suppressed band-base series as one "low – high" range row.
-                        const rangeRow = (p10?: number, span?: number, label?: string) => {
-                          if (p10 == null || span == null) return ["", ""] as [string, string];
-                          return [`${Number(p10).toFixed(2)} – ${Number(p10 + span).toFixed(2)} ${etLabel}`, label ?? ""];
-                        };
-                        if (name === "precipNormalP10")
-                          return rangeRow(entry?.payload?.precipNormalP10, entry?.payload?.precipNormalBandSpan, "Precipitation — Historical range (10th–90th percentile)");
-                        if (name === "precipNormalBandSpan" || name === "deficitBase")
-                          return ["", ""] as [string, string];
-                        return [`${Number(value).toFixed(2)} ${etLabel}`, labels[String(name)] ?? String(name)];
+                    {/* Dual scale: cumulative crop-ET demand (~1000s of mm) on the LEFT; daily
+                        precipitation (a few mm/day) as bars on the RIGHT, so the small rain values
+                        aren't flattened under the ET line. */}
+                    <YAxis
+                      yAxisId="cumulative"
+                      tickLine={false}
+                      axisLine={false}
+                      width={58}
+                      tickMargin={8}
+                      tick={{ fontSize: 12 }}
+                      label={{
+                        value: `Crop ET (${etLabel})`,
+                        angle: -90,
+                        position: "insideLeft",
+                        offset: 2,
+                        dy: 34,
+                        fill: CROP_ET_COLOR,
+                        fontSize: 12,
+                        fontWeight: 800,
                       }}
-                      labelFormatter={(label) => etChartData.find((point) => point.date === label)?.fullDate ?? label}
                     />
-                    {/* Precip normal band (season-aligned P10–P90): wet-vs-dry-year context for supply. */}
-                    {show.precipBand ? (
+                    <YAxis
+                      yAxisId="precip"
+                      orientation="right"
+                      tickLine={false}
+                      axisLine={false}
+                      width={58}
+                      tickMargin={8}
+                      tick={{ fontSize: 12 }}
+                      // Small headroom above the wettest day so the tallest rain bar
+                      // uses most of the chart height without touching the top edge.
+                      domain={[0, (dataMax: number) => (dataMax > 0 ? Math.ceil(dataMax * 1.2) : 1)]}
+                      label={{
+                        value: `Daily precip (${etLabel})`,
+                        angle: -90,
+                        position: "insideRight",
+                        offset: 2,
+                        style: { textAnchor: "middle" },
+                        fill: PRECIP_NORMAL_COLOR,
+                        fontSize: 12,
+                        fontWeight: 800,
+                      }}
+                    />
+                    <Tooltip
+                      content={(props: any) => (
+                        <ChartHoverTooltip
+                          {...props}
+                          formatLabel={(label) => etChartData.find((point) => point.date === label)?.fullDate ?? String(label ?? "")}
+                          resolveRows={resolveEtTooltipRows}
+                        />
+                      )}
+                    />
+                    {/* Invisible zero-opacity series: exists only so the tooltip can surface the
+                        running "demand − supply = gap" deficit — no visible mark of its own. */}
+                    <Area yAxisId="cumulative" type="monotone" dataKey="deficitSpan" stroke="none" fill={WATER_DEFICIT_COLOR} fillOpacity={0} activeDot={false} connectNulls />
+                    {/* Supply: this season's daily precipitation bars (bright blue) — observed
+                        solid, forecast lighter. Shared stackId + exclusive keys = one bar per day.
+                        minPointSize keeps trace-rain days visible (2px stub) without drawing
+                        stubs on dry (zero) days. */}
+                    <Bar yAxisId="precip" dataKey="dailyPrecipHistorical" stackId="rainThisYear" fill={PRECIP_NORMAL_COLOR} barSize={4} minPointSize={visibleRainStub} />
+                    <Bar yAxisId="precip" dataKey="dailyPrecipForecast" stackId="rainThisYear" fill={PRECIP_NORMAL_COLOR} fillOpacity={0.5} barSize={4} minPointSize={visibleRainStub} />
+                    {/* Historical (30-yr) daily-average precipitation bars (light blue), grouped beside this season's. */}
+                    {show.precipNormal ? (
+                      <Bar yAxisId="precip" dataKey="dailyPrecipNormal" fill={PRECIP_HISTORICAL_COLOR} fillOpacity={0.9} barSize={4} minPointSize={visibleRainStub} />
+                    ) : null}
+                    {/* Opt-in reference-ETo overlays (Advanced, default off): the chart reads
+                        as crop ET only unless the user asks for the reference context. */}
+                    {show.etReferenceNormal ? (
+                      <Line yAxisId="cumulative" type="monotone" dataKey="etoNormal" stroke={ETO_NORMAL_COLOR} strokeDasharray="5 4" dot={false} strokeWidth={1.6} strokeOpacity={0.9} connectNulls />
+                    ) : null}
+                    {show.etReferencePriorYear
+                      ? selectedComparisonYears.map((year, index) => (
+                          <Line
+                            key={`year${year}Eto`}
+                            yAxisId="cumulative"
+                            type="monotone"
+                            dataKey={`year${year}Eto`}
+                            stroke={etoComparisonYearColor(index)}
+                            dot={false}
+                            strokeWidth={1.6}
+                            strokeOpacity={0.9}
+                            connectNulls
+                          />
+                        ))
+                      : null}
+                    {/* Opt-in daily crop-ET bars share the right (daily) axis with precipitation. */}
+                    {show.etDailyBars ? (
                       <>
-                        <Area yAxisId="cumulative" type="monotone" dataKey="precipNormalP10" stackId="precipNormalBand" stroke="none" fill="none" connectNulls />
-                        <Area yAxisId="cumulative" type="monotone" dataKey="precipNormalBandSpan" stackId="precipNormalBand" stroke="none" fill={PRECIP_HISTORICAL_COLOR} fillOpacity={0.16} connectNulls />
+                        <Bar yAxisId="precip" dataKey="dailyEtHistorical" stackId="dailyEt" fill={CROP_ET_COLOR} fillOpacity={0.45} barSize={4} />
+                        <Bar yAxisId="precip" dataKey="dailyEtForecast" stackId="dailyEt" fill={CROP_ET_COLOR} fillOpacity={0.25} barSize={4} />
                       </>
                     ) : null}
-                    {/* Irrigation deficit: shaded gap from the precip line up to the crop-ET line. */}
-                    <Area yAxisId="cumulative" type="monotone" dataKey="deficitBase" stackId="waterDeficit" stroke="none" fill="none" connectNulls />
-                    <Area yAxisId="cumulative" type="monotone" dataKey="deficitSpan" stackId="waterDeficit" stroke="none" fill={WATER_DEFICIT_COLOR} fillOpacity={0.3} connectNulls />
-                    {show.precipNormal ? (
-                      <Line yAxisId="cumulative" type="monotone" dataKey="precipNormal" stroke={PRECIP_HISTORICAL_COLOR} strokeDasharray="5 4" dot={false} strokeWidth={1.6} strokeOpacity={0.9} connectNulls />
-                    ) : null}
-                    {/* Supply: cumulative precipitation (teal) — observed solid, forecast dotted (same color). */}
-                    <Line yAxisId="cumulative" type="monotone" dataKey="cumulativePrecipObserved" stroke={PRECIP_NORMAL_COLOR} dot={false} strokeWidth={2.4} connectNulls />
-                    <Line yAxisId="cumulative" type="monotone" dataKey="cumulativePrecipForecast" stroke={PRECIP_NORMAL_COLOR} strokeDasharray="2 4" dot={false} strokeWidth={2.4} strokeOpacity={0.95} connectNulls />
                     {/* Demand: cumulative crop ET / ETc (bold red) — observed solid, forecast dotted (same color). */}
                     <Line yAxisId="cumulative" type="monotone" dataKey="cumulativeEtObserved" stroke={CROP_ET_COLOR} dot={false} strokeWidth={3} connectNulls />
                     <Line yAxisId="cumulative" type="monotone" dataKey="cumulativeEtForecast" stroke={CROP_ET_COLOR} strokeDasharray="2 4" dot={false} strokeWidth={3} strokeOpacity={0.95} connectNulls />
@@ -1275,21 +1492,18 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                     />
                     <Tooltip
                       cursor={{ fill: "rgba(74, 124, 89, 0.18)" }}
-                      contentStyle={{ background: "#ffffff", border: "1px solid #9fa89d", borderRadius: 3, color: "#061827", fontWeight: 800 }}
-                      formatter={(value, name) => {
-                        const labels: Record<string, string> = {
-                          dailyGddHistorical: "Daily GDD",
-                          dailyGddForecast: "Daily GDD (forecast)",
-                          normalDaily: "Daily 30-year average",
-                        };
-                        return [`${Number(value).toFixed(1)} ${unitLabel}`, labels[String(name)] ?? String(name)];
-                      }}
-                      labelFormatter={(label) => gddDailyChartData.find((point) => point.date === label)?.fullDate ?? label}
+                      content={(props: any) => (
+                        <ChartHoverTooltip
+                          {...props}
+                          formatLabel={(label) => gddDailyChartData.find((point) => point.date === label)?.fullDate ?? String(label ?? "")}
+                          resolveRows={resolveGddDailyTooltipRows}
+                        />
+                      )}
                     />
                     <Bar dataKey="dailyGddHistorical" fill={GDD_CURRENT_COLOR} barSize={4} />
                     {forecastVisible ? <Bar dataKey="dailyGddForecast" fill="#eb6834" barSize={4} /> : null}
                     {show.climatologyNormal ? (
-                      <Line type="monotone" dataKey="normalDaily" stroke={GDD_NORMAL_COLOR} strokeDasharray="7 4" dot={false} strokeWidth={2} strokeOpacity={0.95} connectNulls />
+                      <Line type="monotone" dataKey="normalDaily" stroke={GDD_NORMAL_COLOR} dot={false} strokeWidth={2} strokeOpacity={0.95} connectNulls />
                     ) : null}
                     <ReferenceLine x={todayLabel} stroke="#687078" strokeDasharray="2 4" strokeOpacity={0.7} />
                   </ComposedChart>
@@ -1313,7 +1527,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                       tickMargin={8}
                       tick={{ fontSize: 12 }}
                       label={{
-                        value: view === "gdd" ? `Cumulative ${unitLabel}` : "Cumulative Chill Portions",
+                        value: view === "gdd" ? `Cumulative ${unitLabel}` : chillModel === "hours" ? "Cumulative Chill Hours" : "Cumulative Chill Portions",
                         angle: -90,
                         position: "insideLeft",
                         offset: 2,
@@ -1325,36 +1539,13 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                     />
                     <Tooltip
                       cursor={{ fill: "rgba(74, 124, 89, 0.18)", stroke: "#2f6f3a", strokeWidth: 1.5 }}
-                      contentStyle={{ background: "#ffffff", border: "1px solid #9fa89d", borderRadius: 3, color: "#061827", fontWeight: 800 }}
-                      formatter={(value, name, entry: any) => {
-                        const labels: Record<string, string> = {
-                          current: view === "gdd" ? "Current season (to date)" : "Accumulated chill (to date)",
-                          projected: "Forecast",
-                          normal: "30-year average",
-                          normalP50: "30-year median (50th percentile)",
-                          chillNormalP50: "30-year median (50th percentile)",
-                          normalRange: "30-year range (10th–90th percentile)",
-                          chillNormalP10: "30-year range (10th–90th percentile)",
-                        };
-                        comparisonYears.forEach((year) => {
-                          labels[`year${year}`] = `${year} season`;
-                        });
-                        // Surface the shaded band as one "low – high" range row.
-                        if (name === "normalRange") {
-                          const [low, high] = Array.isArray(value) ? value : [undefined, undefined];
-                          if (low == null || high == null) return ["", ""] as [string, string];
-                          return [`${Number(low).toFixed(1)} – ${Number(high).toFixed(1)}`, labels.normalRange];
-                        }
-                        if (name === "chillNormalP10") {
-                          const p10 = entry?.payload?.chillNormalP10;
-                          const span = entry?.payload?.chillNormalBandSpan;
-                          if (p10 == null || span == null) return ["", ""] as [string, string];
-                          return [`${Number(p10).toFixed(1)} – ${Number(p10 + span).toFixed(1)}`, labels.chillNormalP10];
-                        }
-                        if (name === "chillNormalBandSpan") return ["", ""] as [string, string];
-                        return [`${Number(value).toFixed(1)}`, labels[String(name)] ?? String(name)];
-                      }}
-                      labelFormatter={(label) => chartData.find((point) => point.date === label)?.fullDate ?? label}
+                      content={(props: any) => (
+                        <ChartHoverTooltip
+                          {...props}
+                          formatLabel={(label) => chartData.find((point) => point.date === label)?.fullDate ?? String(label ?? "")}
+                          resolveRows={resolveCumulativeTooltipRows}
+                        />
+                      )}
                     />
                     {view === "chill" && chillShowBand ? (
                       <>
@@ -1363,7 +1554,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                       </>
                     ) : null}
                     {view === "chill" && chillShowBand ? (
-                      <Line yAxisId="cumulative" type="monotone" dataKey="chillNormalP50" stroke={CHILL_NORMAL_COLOR} strokeDasharray="2 4" dot={false} strokeWidth={1.3} strokeOpacity={0.7} connectNulls />
+                      <Line yAxisId="cumulative" type="monotone" dataKey="chillNormalP50" stroke={CHILL_NORMAL_COLOR} dot={false} strokeWidth={1.6} strokeOpacity={0.85} connectNulls />
                     ) : null}
                     {view === "gdd" && show.climatologyBand ? (
                       <Area yAxisId="cumulative" type="monotone" dataKey="normalRange" stroke="none" fill={GDD_NORMAL_BAND_COLOR} fillOpacity={0.55} isAnimationActive={false} connectNulls />
@@ -1372,7 +1563,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                       <Line yAxisId="cumulative" type="monotone" dataKey="normalP50" stroke={GDD_NORMAL_COLOR} strokeDasharray="2 4" dot={false} strokeWidth={1.3} strokeOpacity={0.6} connectNulls />
                     ) : null}
                     {view === "gdd" && show.climatologyNormal ? (
-                      <Line yAxisId="cumulative" type="monotone" dataKey="normal" stroke={GDD_NORMAL_COLOR} strokeDasharray="7 4" dot={false} strokeWidth={2} />
+                      <Line yAxisId="cumulative" type="monotone" dataKey="normal" stroke={GDD_NORMAL_COLOR} dot={false} strokeWidth={2} />
                     ) : null}
                     {view === "gdd" && show.stages
                       ? stageReferenceGroups.map((stage) => (
@@ -1401,7 +1592,7 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                       <Line yAxisId="cumulative" type="monotone" dataKey="current" stroke={GDD_CURRENT_COLOR} dot={show.dataMarkers} strokeWidth={3} connectNulls />
                     ) : null}
                     {view === "gdd" ? <ReferenceLine yAxisId="cumulative" x={todayLabel} stroke="#687078" strokeDasharray="2 4" strokeOpacity={0.7} /> : null}
-                    {view === "chill" && chillRequirement ? (
+                    {view === "chill" && chillModel === "portions" && chillRequirement ? (
                       <ReferenceLine
                         yAxisId="cumulative"
                         y={chillRequirement}
@@ -1417,7 +1608,6 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
               </ResponsiveContainer>
             ) : null}
             <ChartLoader active={chartLoading} label={primaryWeatherLoading ? "Loading GDD data" : `Loading ${view} data`} />
-            {chartReady && overlaysLoading && (view === "gdd" || view === "et") ? <div className="chart-overlay-hint">Loading comparison overlays…</div> : null}
             {!chartLoading && !chartData.length ? <div className="chart-empty">No weather records loaded for this field and date range.</div> : null}
           </div>
 
@@ -1434,6 +1624,12 @@ export function Dashboard({ field, onEditStages }: DashboardProps) {
                 ) : null}
               </span>
             ))}
+            {chartReady && overlaysLoading && (view === "gdd" || view === "et") ? (
+              <span className="legend-item legend-loading" role="status" aria-live="polite">
+                <LoaderCircle size={13} aria-hidden="true" />
+                Loading comparison data
+              </span>
+            ) : null}
           </div>
         </section>
 

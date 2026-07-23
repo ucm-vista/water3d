@@ -42,6 +42,24 @@ describe("Open-Meteo API client", () => {
     });
   });
 
+  it("tags seam-backfill records as forecast so gridMET replaces them once available", () => {
+    const records = parseOpenMeteoHistoricalWeather(
+      {
+        daily: {
+          time: ["2026-07-22"],
+          temperature_2m_min: [21.9],
+          temperature_2m_max: [34.3],
+          precipitation_sum: [0],
+          et0_fao_evapotranspiration: [7.1],
+        },
+      },
+      { source: "forecast" },
+    );
+
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ date: "2026-07-22", source: "forecast", etoMm: 7.1 });
+  });
+
   it("skips days missing required temperatures", () => {
     const records = parseOpenMeteoHistoricalWeather({
       daily: {

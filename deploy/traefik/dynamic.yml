@@ -24,6 +24,7 @@ http:
     strip-gridmet:         { stripPrefix: { prefixes: ["/api/gridmet"] } }
     strip-climate-toolbox: { stripPrefix: { prefixes: ["/api/climate-toolbox"] } }
     strip-open-meteo:      { stripPrefix: { prefixes: ["/api/open-meteo"] } }
+    strip-open-meteo-forecast: { stripPrefix: { prefixes: ["/api/open-meteo-forecast"] } }
 
   # Priority 100 so these always beat the SPA catch-all (Host + PathPrefix `/`).
   # Path-only rules are fine: this node only serves the one app on :443, and the
@@ -50,6 +51,15 @@ http:
       tls: {}
       service: open-meteo
       middlewares: [strip-open-meteo, security-headers, gzip]
+    # Priority 110: `/api/open-meteo` is a prefix of this path, so this router
+    # must outrank it or the archive upstream would capture forecast requests.
+    open-meteo-forecast:
+      rule: "PathPrefix(`/api/open-meteo-forecast`)"
+      priority: 110
+      entryPoints: [websecure]
+      tls: {}
+      service: open-meteo-forecast
+      middlewares: [strip-open-meteo-forecast, security-headers, gzip]
 
   services:
     gridmet:
@@ -64,6 +74,10 @@ http:
       loadBalancer:
         passHostHeader: false
         servers: [{ url: "https://archive-api.open-meteo.com" }]
+    open-meteo-forecast:
+      loadBalancer:
+        passHostHeader: false
+        servers: [{ url: "https://api.open-meteo.com" }]
 
 # ---- wildcard TLS certificate for *.vistacompute1.ucmerced.edu ---------------
 # The app is served under this wildcard zone, so a wildcard cert is required

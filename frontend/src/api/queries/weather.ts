@@ -9,6 +9,7 @@ import { getGridMetAvailableThrough, gridMetApi, gridMetProvider } from "../grid
 import { openMeteoApi, openMeteoProvider } from "../openMeteo";
 import type { WeatherRecordSupplement } from "../contracts";
 import type { CropId, WeatherRecord } from "../../types/domain";
+import { addUtcDays, toIsoDate } from "../../utils/dateRange";
 import { debugDataSource } from "../../utils/debug";
 import { weatherKeys, weatherSignature } from "./keys";
 import { TTL } from "./ttl";
@@ -28,6 +29,41 @@ export function mergeWeatherRecords(records: WeatherRecord[]): WeatherRecord[] {
 export interface SeasonWeatherResult {
   records: WeatherRecord[];
   warnings: string[];
+}
+
+// gridMET history lags ~2 days and the CFS endpoint starts wherever its latest
+// model run starts (it ignores our requested start date), so 1-3 recent days
+// routinely fall in neither source — and their GDD would silently drop out of
+// the cumulative series. This computes the uncovered window, which is then
+// backfilled from the Open-Meteo forecast API (its past days are
+// observation-assimilated analysis, validated within ~1 GDD/day of gridMET).
+// Capped so a provider outage can't turn the backfill into a season-length
+// pull from a source we only trust for the recent tail.
+export const MAX_SEAM_BACKFILL_DAYS = 14;
+
+export function seamBackfillRange(input: {
+  lastHistoricalDate?: string;
+  firstForecastDate?: string;
+  todayIso: string;
+}): { startDate: string; endDate: string } | null {
+  const { lastHistoricalDate, firstForecastDate, todayIso } = input;
+  // Without any history there is no seam to fill — the gap is the whole season,
+  // which is an outage for the existing warning to report, not a backfill case.
+  if (!lastHistoricalDate) return null;
+
+  const shiftDays = (iso: string, days: number) => toIsoDate(addUtcDays(new Date(`${iso}T00:00:00Z`), days));
+
+  let endDate = todayIso;
+  if (firstForecastDate) {
+    const dayBeforeForecast = shiftDays(firstForecastDate, -1);
+    if (dayBeforeForecast < endDate) endDate = dayBeforeForecast;
+  }
+
+  let startDate = shiftDays(lastHistoricalDate, 1);
+  const cappedStart = shiftDays(endDate, -(MAX_SEAM_BACKFILL_DAYS - 1));
+  if (startDate < cappedStart) startDate = cappedStart;
+
+  return startDate <= endDate ? { startDate, endDate } : null;
 }
 
 export function applyWeatherSupplements(
@@ -87,12 +123,10 @@ export function useSeasonWeather(params: SeasonWeatherParams) {
           : Promise.reject(new Error("Climate Toolbox forecast weather is not enabled.")),
       ]);
 
+      let gridMetAvailableThrough: string | undefined;
       if (historicalResult.status === "fulfilled") {
         merged.push(...historicalResult.value.records);
-        const availableThrough = getGridMetAvailableThrough(historicalResult.value.metadata.qualityFlags);
-        if (availableThrough) {
-          warnings.push(`gridMET history is available through ${availableThrough} (the most recent days typically lag by ~2 days).`);
-        }
+        gridMetAvailableThrough = getGridMetAvailableThrough(historicalResult.value.metadata.qualityFlags);
       } else if (gridMetApi.enabled) {
         warnings.push(historicalResult.reason instanceof Error ? historicalResult.reason.message : "gridMET historical weather could not be loaded.");
         debugDataSource("gridmet", "historical weather request failed", { fieldId, error: String(historicalResult.reason) });
@@ -103,6 +137,39 @@ export function useSeasonWeather(params: SeasonWeatherParams) {
       } else if (climateToolboxApi.enabled) {
         warnings.push(forecastResult.reason instanceof Error ? forecastResult.reason.message : "Climate Toolbox forecast weather could not be loaded.");
         debugDataSource("climate-toolbox", "forecast weather request failed", { fieldId, error: String(forecastResult.reason) });
+      }
+
+      // Fill the seam between gridMET's lagged tail and the first CFS day from
+      // the Open-Meteo forecast API. Tagged "forecast", the filled days render
+      // on the dashed line and are replaced by gridMET as it catches up.
+      const seamRange = seamBackfillRange({
+        lastHistoricalDate: historicalResult.status === "fulfilled" ? historicalResult.value.records.at(-1)?.date : undefined,
+        firstForecastDate: forecastResult.status === "fulfilled" ? forecastResult.value.forecastRecords?.[0]?.date : undefined,
+        todayIso,
+      });
+      let seamFilled = false;
+      if (seamRange && openMeteoApi.enabled) {
+        try {
+          const backfill = await openMeteoProvider.getRecentDailyWeather({
+            cropId,
+            lat,
+            lon,
+            startDate: seamRange.startDate,
+            endDate: seamRange.endDate,
+          });
+          merged.push(...backfill.records.filter((record) => record.date >= seamRange.startDate && record.date <= seamRange.endDate));
+          seamFilled = true;
+        } catch (error) {
+          debugDataSource("open-meteo", "seam backfill request failed", { fieldId, error: String(error) });
+        }
+      }
+
+      if (gridMetAvailableThrough) {
+        warnings.push(
+          seamFilled && seamRange
+            ? `gridMET history is available through ${gridMetAvailableThrough}; ${seamRange.startDate} to ${seamRange.endDate} are estimated from Open-Meteo until gridMET catches up.`
+            : `gridMET history is available through ${gridMetAvailableThrough} (the most recent days typically lag by ~2 days).`,
+        );
       }
 
       // Nothing usable came back: surface as an error so it retries and is never

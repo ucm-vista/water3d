@@ -1,4 +1,4 @@
-import { openMeteoConfig, getOpenMeteoArchiveUrl } from "../config/openMeteo";
+import { openMeteoConfig, getOpenMeteoArchiveUrl, getOpenMeteoForecastUrl } from "../config/openMeteo";
 import type { WeatherRecord } from "../types/domain";
 import { debugDataSource } from "../utils/debug";
 import { fetchWithTimeout } from "../utils/fetchWithTimeout";
@@ -24,6 +24,7 @@ export const openMeteoApi = {
   enabled: openMeteoConfig.enabled,
   urls: {
     archive: getOpenMeteoArchiveUrl(),
+    forecast: getOpenMeteoForecastUrl(),
   },
 };
 
@@ -48,7 +49,11 @@ function round(value: number, digits = 2): number {
   return Number(value.toFixed(digits));
 }
 
-export function parseOpenMeteoHistoricalWeather(payload: OpenMeteoHistoricalPayload): WeatherRecord[] {
+export function parseOpenMeteoHistoricalWeather(
+  payload: OpenMeteoHistoricalPayload,
+  options: { source?: WeatherRecord["source"] } = {},
+): WeatherRecord[] {
+  const source = options.source ?? "historical";
   const daily = payload.daily;
   if (!daily?.time?.length) {
     return [];
@@ -86,7 +91,7 @@ export function parseOpenMeteoHistoricalWeather(payload: OpenMeteoHistoricalPayl
         tmaxC: round(tmaxC),
         precipMm: round(toFiniteNumber(daily.precipitation_sum?.[index]) ?? 0),
         etoMm: round(toFiniteNumber(daily.et0_fao_evapotranspiration?.[index]) ?? 0),
-        source: "historical" as const,
+        source,
         rhMin: hourly?.rh.length ? Math.min(...hourly.rh) : undefined,
         rhMax: hourly?.rh.length ? Math.max(...hourly.rh) : undefined,
         tdewC: typeof dewpoint === "number" ? round(dewpoint) : undefined,
@@ -150,6 +155,66 @@ export class OpenMeteoProvider {
           provider: "open-meteo",
           generatedAt: new Date().toISOString(),
           sourceUrl: openMeteoApi.urls.archive,
+        },
+      };
+    })().finally(() => {
+      openMeteoInFlightRequests.delete(cacheKey);
+    });
+
+    openMeteoInFlightRequests.set(cacheKey, promise);
+    return promise;
+  }
+
+  // Recent daily weather from the forecast API (api.open-meteo.com), whose past
+  // days are observation-assimilated analysis published without lag. Used to
+  // backfill the seam between gridMET's ~2-day-lagged history and the first CFS
+  // forecast day. Records are tagged source "forecast" so they render on the
+  // dashed (projected) line and lose to gridMET history in any merge overlap.
+  async getRecentDailyWeather(request: WeatherDataRequest): Promise<WeatherDataResponse> {
+    if (!openMeteoApi.enabled) {
+      throw new Error("Open-Meteo recent weather is not enabled.");
+    }
+
+    const url = new URL(openMeteoApi.urls.forecast, window.location.origin);
+    url.searchParams.set("latitude", String(request.lat));
+    url.searchParams.set("longitude", String(request.lon));
+    url.searchParams.set("start_date", request.startDate);
+    url.searchParams.set("end_date", request.endDate);
+    url.searchParams.set("timezone", request.timezone ?? "auto");
+    url.searchParams.set("temperature_unit", "celsius");
+    url.searchParams.set("precipitation_unit", "mm");
+    url.searchParams.set("daily", ["temperature_2m_min", "temperature_2m_max", "precipitation_sum", "et0_fao_evapotranspiration"].join(","));
+
+    const cacheKey = url.toString();
+    const inFlight = openMeteoInFlightRequests.get(cacheKey);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const promise = (async (): Promise<WeatherDataResponse> => {
+      const response = await fetchWithTimeout(url.toString());
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        throw new Error(`Open-Meteo recent weather request failed with ${response.status}${detail ? `: ${detail.slice(0, 240)}` : ""}.`);
+      }
+
+      const payload = (await response.json()) as OpenMeteoHistoricalPayload;
+      debugDataSource("open-meteo", "raw recent weather response", {
+        payload,
+        requestUrl: url.toString(),
+      });
+
+      const records = parseOpenMeteoHistoricalWeather(payload, { source: "forecast" });
+      if (!records.length) {
+        throw new Error("Open-Meteo did not return usable recent weather records.");
+      }
+
+      return {
+        records,
+        metadata: {
+          provider: "open-meteo",
+          generatedAt: new Date().toISOString(),
+          sourceUrl: openMeteoApi.urls.forecast,
         },
       };
     })().finally(() => {

@@ -46,6 +46,8 @@ export interface FieldConfig {
   areaAcres?: number;
   gddBaseTempC?: number;
   gddUpperTempC?: number;
+  /** Flat crop-coefficient override; unset = the crop profile's stage-varying Kc curve. */
+  kcOverride?: number;
   stageThresholds?: StageThreshold[];
   rootDepthM?: number;
   madFraction?: number;
